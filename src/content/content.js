@@ -8,7 +8,7 @@
  */
 
 import { MSG, State } from '../shared/constants.js';
-import { extractParagraphs, getTranslatableText, generateParagraphId } from './extractor.js';
+import { extractParagraphs, getTranslatableText, generateParagraphId } from './extractor/index.js';
 import { computeFingerprint, markTranslated } from './fingerprint.js';
 import { BatchCollector } from './batch-collector.js';
 import { ObserverManager } from './observer-manager.js';

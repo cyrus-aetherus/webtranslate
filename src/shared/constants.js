@@ -79,11 +79,28 @@ export const CONTENT_SELECTORS = [
   '.post',
   '.entry-content',
   '[role="main"]',
+  '.markdown-body',
+  '.prose',
+  '#main-content',
+  '.post-content',
+  '.page-content',
+  '.document',
+  '.docs-content',
+  '.doc-content',
+  '.article-content',
+  '.entry',
 ];
 
 export const TRANSLATABLE_TAGS = new Set([
   'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
   'LI', 'TD', 'TH', 'BLOCKQUOTE',
+  'DD', 'DT', 'FIGCAPTION',
+]);
+
+// Tags that can act as text containers when they hold direct text
+// without semantic child tags (e.g. <div>text</div>)
+export const TEXT_CONTAINER_TAGS = new Set([
+  'DIV', 'SECTION', 'SPAN',
 ]);
 
 export const EXCLUDED_CONTAINERS = new Set([
@@ -93,6 +110,14 @@ export const EXCLUDED_CONTAINERS = new Set([
 
 export const EXCLUDED_ROLES = [
   'complementary', 'navigation', 'banner', 'contentinfo',
+];
+
+// CSS class name patterns that indicate non-content areas
+export const EXCLUDED_CLASS_PATTERNS = [
+  /(^|\s)(ad-|ads-|advertisement|banner|sponsor)/i,
+  /(^|\s)(sidebar|side-bar|side_nav)/i,
+  /(^|\s)(nav-|navbar|menu-|dropdown|breadcrumbs)/i,
+  /(^|\s)(modal|popup|toast|notification|cookie-banner|consent)/i,
 ];
 
 export const PROTECTED_TAGS = new Set([

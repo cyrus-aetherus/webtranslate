@@ -21,24 +21,24 @@ function injectStyles() {
   _stylesInjected = true;
   const css = `
 .wt-inline-block{font-family:'Segoe UI Variable','Segoe UI',system-ui,-apple-system,sans-serif;
-  margin:10px 0;border-radius:12px;border:1px solid #e7e0ec;
-  background:#fff;color:#1d1b20;font-size:14px;line-height:1.65;
-  box-shadow:0 1px 3px rgba(0,0,0,.06);
-  padding:12px 16px;word-break:break-word;
+  position:relative;margin:4px 0;border-radius:6px;border:1px solid #e7e0ec;
+  background:#fff;color:#1d1b20;font-size:13px;line-height:1.45;
+  box-shadow:0 1px 2px rgba(0,0,0,.04);
+  padding:6px 10px;word-break:break-word;
   animation:wt-fade-in .2s ease;}
-@keyframes wt-fade-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
-.wt-inline-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
-.wt-inline-badge{font-size:11px;font-weight:500;color:#6750a4;letter-spacing:.3px;
-  display:flex;align-items:center;gap:6px;}
-.wt-inline-fold{background:#fff;border:1px solid #cac4d0;border-radius:16px;
-  padding:3px 12px;font-size:11px;font-weight:500;cursor:pointer;color:#6750a4;transition:background .15s;}
-.wt-inline-fold:hover{background:#eaddff;}
+@keyframes wt-fade-in{from{opacity:0;transform:translateY(2px)}to{opacity:1;transform:translateY(0)}}
+.wt-inline-badge{display:inline-flex;align-items:center;margin-right:3px;vertical-align:middle;}
+.wt-inline-fold{position:absolute;top:4px;right:6px;background:transparent;border:none;
+  padding:0;font-size:12px;line-height:1;cursor:pointer;color:#6750a4;opacity:0.35;
+  transition:opacity .15s;z-index:1;}
+.wt-inline-block:hover .wt-inline-fold{opacity:0.7;}
+.wt-inline-fold:hover{opacity:1;}
 .wt-inline-fold:focus-visible{outline:2px solid #6750a4;outline-offset:1px;}
-.wt-inline-body{font-size:14px;line-height:1.65;color:#1d1b20;}
+.wt-inline-body{font-size:13px;line-height:1.45;color:#1d1b20;}
 .wt-pending{font-family:'Segoe UI Variable','Segoe UI',system-ui,-apple-system,sans-serif;
-  margin:4px 0;padding:6px 12px;color:#79747e;font-size:12px;display:flex;align-items:center;gap:8px;
+  margin:2px 0;padding:4px 8px;color:#79747e;font-size:11px;display:flex;align-items:center;gap:6px;
   animation:wt-fade-in .2s ease;}
-.wt-spinner{display:inline-block;width:14px;height:14px;border:2px solid #e7e0ec;
+.wt-spinner{display:inline-block;width:12px;height:12px;border:2px solid #e7e0ec;
   border-top-color:#6750a4;border-radius:50%;animation:wt-spin .7s linear infinite;}
 @keyframes wt-spin{to{transform:rotate(360deg)}}
 `;
@@ -66,10 +66,7 @@ export class InlineRenderer {
     card.dataset.wtId = paragraphId;
 
     card.innerHTML = `
-      <div class="wt-inline-header">
-        <span class="wt-inline-badge">${logoBadge(13)} ${t('inline.badge')}</span>
-        <button class="wt-inline-fold">${t('inline.toggle_fold')}</button>
-      </div>
+      <button class="wt-inline-fold">⌄</button>
       <div class="wt-inline-body">${escapeHtml(translation)}</div>`;
 
     card.querySelector('.wt-inline-fold').addEventListener('click', () => {
@@ -77,7 +74,7 @@ export class InlineRenderer {
       const btn = card.querySelector('.wt-inline-fold');
       const f = body.style.display === 'none';
       body.style.display = f ? '' : 'none';
-      btn.textContent = f ? t('inline.toggle_fold') : t('inline.toggle_unfold');
+      btn.textContent = f ? '⌄' : '⌃';
     });
 
     originalEl.insertAdjacentElement('afterend', card);

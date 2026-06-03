@@ -5,7 +5,7 @@
  */
 
 import { debounce } from '../shared/utils.js';
-import { TRANSLATABLE_TAGS } from '../shared/constants.js';
+import { scanTextBlocks } from './extractor/content-scanner.js';
 
 export class ObserverManager {
   /**
@@ -59,15 +59,9 @@ export class ObserverManager {
     for (const node of addedNodes) {
       if (node.nodeType !== Node.ELEMENT_NODE) continue;
 
-      // If the node itself is translatable
-      if (TRANSLATABLE_TAGS.has(node.tagName) && !node.dataset.wtDone) {
-        node.dataset.wtObservable = 'true';
-        newElements.push(node);
-      }
-
-      // Also scan its descendants
-      const descendants = node.querySelectorAll(Array.from(TRANSLATABLE_TAGS).join(','));
-      for (const el of descendants) {
+      const blocks = scanTextBlocks(node);
+      for (const block of blocks) {
+        const el = block.element;
         if (!el.dataset.wtDone && !el.dataset.wtObservable) {
           el.dataset.wtObservable = 'true';
           newElements.push(el);

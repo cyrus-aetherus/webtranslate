@@ -22,8 +22,7 @@ export function djb2Hash(str) {
   const hex1 = (h1 >>> 0).toString(16).padStart(8, '0');
   const hex2 = (h2 >>> 0).toString(16).padStart(8, '0');
   const combined = hex1 + hex2; // 16 chars
-  const randomSuffix = Math.floor(Math.random() * 256).toString(16).padStart(2, '0');
-  return (combined + randomSuffix).slice(0, 14);
+  return combined.slice(0, 14);
 }
 
 /**
