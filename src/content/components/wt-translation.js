@@ -70,17 +70,14 @@ export class WtTranslation extends HTMLElement {
       }
       @keyframes wt-fade-in { from { opacity:0 } to { opacity:1 } }
       .wt-block {
-        background: rgba(15,23,42,.94);
-        border-left: 3px solid #22d3ee;
-        border-radius: 0 8px 8px 0;
-        padding: 10px 14px;
-        color: #e2e8f0;
+        background: #ffffff;
+        border: 1px solid #e7e0ec;
+        border-radius: 12px;
+        padding: 12px 14px;
+        color: #1d1b20;
         font-size: 14px;
         line-height: 1.6;
-        box-shadow: 0 0 16px rgba(34,211,238,.05), 0 1px 4px rgba(0,0,0,.3);
-        border: 1px solid rgba(34,211,238,.08);
-        border-left: 3px solid #22d3ee;
-        backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+        box-shadow: 0 1px 3px rgba(0,0,0,.06);
       }
       .wt-header {
         display: flex;
@@ -91,29 +88,29 @@ export class WtTranslation extends HTMLElement {
       .wt-badge {
         font-size: 12px;
         font-weight: 600;
-        color: #22d3ee;
+        color: #6750a4;
         display: flex;
         align-items: center;
         gap: 6px;
       }
       .wt-badge svg { flex-shrink:0; }
       .wt-toggle {
-        background: rgba(15,23,42,.8);
-        border: 1px solid rgba(148,163,184,.25);
-        border-radius: 4px;
-        padding: 2px 8px;
+        background: transparent;
+        border: 1px solid #cac4d0;
+        border-radius: 20px;
+        padding: 2px 12px;
         font-size: 12px;
         cursor: pointer;
-        color: #cbd5e1;
+        color: #49454f;
         transition: all .2s;
       }
       .wt-toggle:focus-visible {
-        outline: 2px solid #22d3ee; outline-offset: 1px;
+        outline: 2px solid #6750a4; outline-offset: 1px;
       }
       .wt-toggle:hover {
-        border-color: #22d3ee;
-        color: #22d3ee;
-        box-shadow: 0 0 10px rgba(34,211,238,.1);
+        border-color: #6750a4;
+        color: #6750a4;
+        background: #f7f2fa;
       }
       .wt-body {
         word-break: break-word;
@@ -122,26 +119,26 @@ export class WtTranslation extends HTMLElement {
         display: none;
       }
       a {
-        color: #22d3ee;
+        color: #6750a4;
         text-decoration: none;
       }
       a:hover {
         text-decoration: underline;
       }
       code {
-        background: rgba(34,211,238,.08);
+        background: #f7f2fa;
         padding: 2px 4px;
         border-radius: 4px;
         font-family: ui-monospace, SFMono-Regular, monospace;
         font-size: 12px;
-        color: #67e8f9;
+        color: #6750a4;
       }
       pre {
-        background: rgba(34,211,238,.06);
+        background: #f7f2fa;
         padding: 8px;
-        border-radius: 6px;
+        border-radius: 8px;
         overflow-x: auto;
-        border: 1px solid rgba(34,211,238,.1);
+        border: 1px solid #e7e0ec;
       }
     `;
     this._shadow.appendChild(style);

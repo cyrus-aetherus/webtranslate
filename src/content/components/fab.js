@@ -1,12 +1,10 @@
 /**
- * FabComponent — Sci-fi floating action button matching the WebTranslate logo.
+ * FabComponent — Material 3 floating action button.
  *
- * Design language (synchronised with icon128.png):
- *   Dark glass-morphism background (slate-900)
- *   Neon cyan accents (#22d3ee)
- *   Logo mark: white "T" + cyan reticle ring + four corner brackets
- *   Subtle glow pulse on active
- *   Compact radial menu with frosted labels & SVG line icons
+ * Design language:
+ *   White surface, subtle shadows, purple primary (#6750a4)
+ *   Pill-shaped buttons (20px radius), 12px card corners
+ *   Compact radial menu with clean labels & SVG line icons
  */
 
 const SIZE = 44;
@@ -15,95 +13,66 @@ const STYLE_ID = 'wt-fab-css';
 // Single <style> injected once
 const CSS = `
 #wt-fab-backdrop{position:fixed;inset:0;z-index:2147483645;pointer-events:none;
-  background:transparent;transition:background .25s;}
-#wt-fab-backdrop.open{pointer-events:auto;background:rgba(0,0,0,.45);
-  backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);}
+  background:transparent;transition:background .2s;}
+#wt-fab-backdrop.open{pointer-events:auto;background:rgba(0,0,0,.15);}
 
 #wt-fab{position:fixed;z-index:2147483647;width:${SIZE}px;height:${SIZE}px;
   border-radius:50%;cursor:pointer;user-select:none;touch-action:none;
   display:flex;align-items:center;justify-content:center;
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
-  transition:transform .3s cubic-bezier(.34,1.56,.64,1),box-shadow .4s;}
-#wt-fab:hover{transform:scale(1.12);}
+  font-family:'Segoe UI Variable','Segoe UI',system-ui,-apple-system,sans-serif;
+  background:#fff;
+  box-shadow:0 1px 3px rgba(0,0,0,.12),0 4px 12px rgba(0,0,0,.08);
+  transition:transform .2s,box-shadow .2s;}
+#wt-fab:hover{transform:scale(1.08);box-shadow:0 2px 6px rgba(0,0,0,.14),0 6px 18px rgba(0,0,0,.1);}
 
-/* ---- IDLE — dark glass, muted strokes ---- */
-#wt-fab.wt-idle{
-  background:rgba(15,23,42,.92);
-  box-shadow:0 0 0 1px rgba(255,255,255,.06),
-    0 0 20px rgba(34,211,238,.06),0 4px 16px rgba(0,0,0,.4);
-  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);}
-#wt-fab.wt-idle .wt-fab-t{fill:#fff;}
-#wt-fab.wt-idle .wt-fab-ring{stroke:rgba(148,163,184,.4);fill:none;}
-#wt-fab.wt-idle .wt-fab-bracket{stroke:rgba(148,163,184,.5);fill:none;}
+/* ---- IDLE ---- */
+#wt-fab.wt-idle .wt-fab-t{fill:#6750a4;}
+#wt-fab.wt-idle .wt-fab-ring{stroke:#cac4d0;fill:none;}
+#wt-fab.wt-idle .wt-fab-bracket{stroke:#cac4d0;fill:none;}
 
-/* ---- ACTIVE — cyan glow pulse ---- */
-#wt-fab.wt-active{
-  background:rgba(6,182,212,.15);
-  box-shadow:0 0 0 1px rgba(34,211,238,.3),
-    0 0 32px rgba(34,211,238,.28),0 0 64px rgba(34,211,238,.12),0 4px 16px rgba(0,0,0,.4);
-  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
-  animation:wt-glow 2s ease-in-out infinite;}
-#wt-fab.wt-active .wt-fab-t{fill:#fff;}
-#wt-fab.wt-active .wt-fab-ring{stroke:#22d3ee;fill:none;filter:drop-shadow(0 0 4px rgba(34,211,238,.5));}
-#wt-fab.wt-active .wt-fab-bracket{stroke:#22d3ee;fill:none;filter:drop-shadow(0 0 3px rgba(34,211,238,.4));}
+/* ---- ACTIVE ---- */
+#wt-fab.wt-active{background:#eaddff;}
+#wt-fab.wt-active .wt-fab-t{fill:#6750a4;}
+#wt-fab.wt-active .wt-fab-ring{stroke:#6750a4;fill:none;}
+#wt-fab.wt-active .wt-fab-bracket{stroke:#6750a4;fill:none;}
 
-/* ---- PAUSED — amber ---- */
-#wt-fab.wt-paused{
-  background:rgba(245,158,11,.12);
-  box-shadow:0 0 0 1px rgba(245,158,11,.25),
-    0 0 24px rgba(245,158,11,.2),0 4px 16px rgba(0,0,0,.4);
-  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);}
-#wt-fab.wt-paused .wt-fab-t{fill:#fbbf24;}
-#wt-fab.wt-paused .wt-fab-ring{stroke:#f59e0b;fill:none;}
-#wt-fab.wt-paused .wt-fab-bracket{stroke:#f59e0b;fill:none;filter:drop-shadow(0 0 2px rgba(245,158,11,.3));}
+/* ---- PAUSED ---- */
+#wt-fab.wt-paused{background:#fef7e0;}
+#wt-fab.wt-paused .wt-fab-t{fill:#795600;}
+#wt-fab.wt-paused .wt-fab-ring{stroke:#795600;fill:none;}
+#wt-fab.wt-paused .wt-fab-bracket{stroke:#795600;fill:none;}
 
-/* ---- ERROR — red ---- */
-#wt-fab.wt-error{
-  background:rgba(239,68,68,.12);
-  box-shadow:0 0 0 1px rgba(239,68,68,.25),
-    0 0 24px rgba(239,68,68,.2),0 4px 16px rgba(0,0,0,.4);
-  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);}
-#wt-fab.wt-error .wt-fab-t{fill:#fca5a5;}
-#wt-fab.wt-error .wt-fab-ring{stroke:#ef4444;fill:none;}
-#wt-fab.wt-error .wt-fab-bracket{stroke:#ef4444;fill:none;filter:drop-shadow(0 0 2px rgba(239,68,68,.3));}
-
-@keyframes wt-glow{
-  0%,100%{box-shadow:0 0 0 1px rgba(34,211,238,.3),
-    0 0 32px rgba(34,211,238,.28),0 0 64px rgba(34,211,238,.12),0 4px 16px rgba(0,0,0,.4);}
-  50%{box-shadow:0 0 0 1px rgba(34,211,238,.55),
-    0 0 48px rgba(34,211,238,.45),0 0 80px rgba(34,211,238,.22),0 4px 16px rgba(0,0,0,.4);}}
+/* ---- ERROR ---- */
+#wt-fab.wt-error{background:#f9dedc;}
+#wt-fab.wt-error .wt-fab-t{fill:#b3261e;}
+#wt-fab.wt-error .wt-fab-ring{stroke:#b3261e;fill:none;}
+#wt-fab.wt-error .wt-fab-bracket{stroke:#b3261e;fill:none;}
 
 /* Progress ring */
 .wt-fab-ring-progress{position:absolute;inset:-3px;}
-.wt-fab-ring-progress circle{fill:none;stroke:#22d3ee;stroke-width:2;stroke-linecap:round;
-  transform:rotate(-90deg);transform-origin:50% 50%;
-  transition:stroke-dashoffset .4s ease;}
+.wt-fab-ring-progress circle{fill:none;stroke:#6750a4;stroke-width:2;stroke-linecap:round;
+  transform:rotate(-90deg);transform-origin:50% 50%;transition:stroke-dashoffset .4s ease;}
 
 /* ---- Menu items ---- */
-.wt-fab-menu-item{position:absolute;display:flex;align-items:center;gap:10px;
+.wt-fab-menu-item{position:absolute;display:flex;align-items:center;gap:8px;
   white-space:nowrap;cursor:pointer;pointer-events:auto;
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
-  font-size:13px;color:#e2e8f0;transition:opacity .25s,transform .35s cubic-bezier(.34,1.56,.64,1);}
+  font-family:'Segoe UI Variable','Segoe UI',system-ui,-apple-system,sans-serif;
+  font-size:13px;color:#1d1b20;transition:opacity .2s,transform .25s cubic-bezier(.2,0,0,1);}
 .wt-fab-menu-item .wt-mi-dot{width:36px;height:36px;border-radius:50%;
   display:flex;align-items:center;justify-content:center;
-  background:rgba(15,23,42,.9);flex-shrink:0;
-  box-shadow:0 0 0 1px rgba(255,255,255,.06),0 0 16px rgba(34,211,238,.06),0 4px 12px rgba(0,0,0,.3);
-  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-  transition:box-shadow .2s,transform .2s,background .2s;}
-.wt-fab-menu-item:hover .wt-mi-dot{
-  box-shadow:0 0 0 1px rgba(34,211,238,.3),0 0 24px rgba(34,211,238,.2),0 4px 12px rgba(0,0,0,.3);
-  transform:scale(1.12);background:rgba(34,211,238,.08);}
-.wt-fab-menu-item .wt-mi-label{background:rgba(15,23,42,.85);padding:6px 14px;border-radius:8px;
-  box-shadow:0 0 0 1px rgba(255,255,255,.06);font-weight:500;font-size:12px;
-  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}
-.wt-fab-menu-item.wt-active-mode .wt-mi-dot{
-  box-shadow:0 0 0 2px #22d3ee,0 0 24px rgba(34,211,238,.35);background:rgba(6,182,212,.15);}
-.wt-fab-menu-item.wt-stop .wt-mi-dot{box-shadow:0 0 0 1px rgba(248,113,113,.2);}
-.wt-fab-menu-item.wt-stop:hover .wt-mi-dot{
-  box-shadow:0 0 0 1px rgba(248,113,113,.4),0 0 20px rgba(248,113,113,.2);background:rgba(248,113,113,.08);}
+  background:#fff;flex-shrink:0;border:1px solid #e7e0ec;
+  box-shadow:0 1px 3px rgba(0,0,0,.08);
+  transition:background .15s,transform .15s;}
+.wt-fab-menu-item:hover .wt-mi-dot{background:#eaddff;transform:scale(1.08);}
+.wt-fab-menu-item .wt-mi-label{background:#fff;padding:5px 12px;border-radius:16px;
+  border:1px solid #e7e0ec;font-weight:500;font-size:12px;color:#1d1b20;
+  box-shadow:0 1px 3px rgba(0,0,0,.06);}
+.wt-fab-menu-item.wt-active-mode .wt-mi-dot{background:#eaddff;border-color:#6750a4;}
+.wt-fab-menu-item.wt-stop .wt-mi-dot{border-color:#f2b8b5;}
+.wt-fab-menu-item.wt-stop:hover .wt-mi-dot{background:#f9dedc;}
 
 /* Focus-visible */
-#wt-fab:focus-visible{outline:2px solid #22d3ee;outline-offset:3px;}
+#wt-fab:focus-visible{outline:2px solid #6750a4;outline-offset:3px;}
 `;
 
 // Logo-matching SVG: white "T" + reticle ring + four corner brackets
@@ -118,21 +87,21 @@ const SVG_ICON = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none">
 
 // SVG line icons for radial menu (replacing emoji)
 const MENU_ICONS = {
-  translate: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e2e8f0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+  translate: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#49454f" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
     <path d="M5 8l6 6"/><path d="M4 14l6-6 2-3"/>
     <path d="M2 5h12"/><path d="M7 2h1"/>
     <path d="M22 22l-5-10-5 10"/><path d="M14 18h6"/>
   </svg>`,
-  panel: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e2e8f0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+  panel: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#49454f" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
     <rect x="3" y="3" width="18" height="18" rx="2"/>
     <line x1="9" y1="3" x2="9" y2="21"/>
   </svg>`,
-  download: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e2e8f0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+  download: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#49454f" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
     <polyline points="7 10 12 15 17 10"/>
     <line x1="12" y1="15" x2="12" y2="3"/>
   </svg>`,
-  settings: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e2e8f0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+  settings: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#49454f" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
     <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
     <line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/>
     <line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/>
@@ -140,7 +109,7 @@ const MENU_ICONS = {
     <line x1="9" y1="8" x2="15" y2="8"/>
     <line x1="17" y1="16" x2="23" y2="16"/>
   </svg>`,
-  stop: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  stop: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#b3261e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
     <line x1="18" y1="6" x2="6" y2="18"/>
     <line x1="6" y1="6" x2="18" y2="18"/>
   </svg>`,
