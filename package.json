@@ -1,0 +1,26 @@
+{
+  "name": "webtranslate",
+  "version": "1.0.0",
+  "description": "基于大模型 API 的网页翻译与下载工具",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:watch": "vite build --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src/"
+  },
+  "devDependencies": {
+    "eslint": "^8.0.0",
+    "jimp": "^1.6.1",
+    "jsdom": "^29.1.1",
+    "vite": "^5.0.0",
+    "vitest": "^1.0.0"
+  },
+  "dependencies": {
+    "dompurify": "^3.0.6",
+    "jszip": "^3.10.1",
+    "turndown": "^7.1.2"
+  }
+}

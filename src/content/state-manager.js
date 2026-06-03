@@ -1,0 +1,77 @@
+/**
+ * StateManager - Translation state machine
+ * States: IDLE → SCANNING → TRANSLATING ↔ PAUSED → ERROR → IDLE
+ * All transitions are guarded; invalid transitions are rejected.
+ */
+
+import { State } from '../shared/constants.js';
+
+const VALID_TRANSITIONS = {
+  [State.IDLE]: [State.SCANNING],
+  [State.SCANNING]: [State.TRANSLATING, State.IDLE, State.ERROR],
+  [State.TRANSLATING]: [State.PAUSED, State.IDLE, State.ERROR],
+  [State.PAUSED]: [State.TRANSLATING, State.IDLE, State.ERROR],
+  [State.ERROR]: [State.IDLE, State.SCANNING],
+};
+
+export class StateManager {
+  constructor() {
+    this._state = State.IDLE;
+    this._listeners = [];
+    this._history = []; // for debugging
+  }
+
+  /** @returns {string} current state */
+  get() {
+    return this._state;
+  }
+
+  /**
+   * Attempt to transition to a new state.
+   * @param {string} to
+   * @returns {boolean} true if transition succeeded
+   */
+  transition(to) {
+    const from = this._state;
+    const allowed = VALID_TRANSITIONS[from] ?? [];
+    if (!allowed.includes(to)) {
+      console.warn(`[WT] Invalid state transition: ${from} -> ${to}`);
+      return false;
+    }
+    this._state = to;
+    this._history.push({ from, to, at: Date.now() });
+    this._notify(to, from);
+    return true;
+  }
+
+  /**
+   * Register a state change listener.
+   * @param {(newState: string, oldState: string) => void} fn
+   */
+  onChange(fn) {
+    this._listeners.push(fn);
+  }
+
+  /**
+   * Remove a state change listener.
+   * @param {(newState: string, oldState: string) => void} fn
+   */
+  offChange(fn) {
+    this._listeners = this._listeners.filter((l) => l !== fn);
+  }
+
+  _notify(to, from) {
+    for (const fn of this._listeners) {
+      try {
+        fn(to, from);
+      } catch (err) {
+        console.error('[WT] State listener error:', err);
+      }
+    }
+  }
+
+  /** Debug helper */
+  getHistory() {
+    return [...this._history];
+  }
+}
