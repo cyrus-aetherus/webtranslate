@@ -13,6 +13,8 @@ export class ApiProxy {
   constructor() {
     /** @type {Map<string, AbortController>} */
     this._controllers = new Map();
+    /** @type {Set<string>} batchIds intentionally stopped — no retry */
+    this._stopped = new Set();
   }
 
   /**
@@ -21,6 +23,8 @@ export class ApiProxy {
    *   - 2 retries for generic failures, backoff 1s -> 3s
    *   - 429: read Retry-After header or exponential backoff 2s -> 4s -> 8s
    *   - 401/403: no retry (auth failure)
+   *   - If stopAll() was called, in-flight requests complete naturally
+   *     but retries are suppressed.
    * @param {{id:string, fingerprint:string, text:string}[]} items
    * @param {object} config
    * @param {string} batchId
@@ -36,9 +40,16 @@ export class ApiProxy {
 
       try {
         const result = await this._doFetch(items, config, controller);
+        this._stopped.delete(batchId);
         return result;
       } catch (err) {
         this._controllers.delete(batchId);
+
+        // Intentional stop — suppress retry
+        if (this._stopped.has(batchId)) {
+          this._stopped.delete(batchId);
+          throw err;
+        }
 
         // Non-retryable: auth errors
         if (err.message?.includes('Auth failed')) throw err;
@@ -105,20 +116,26 @@ export class ApiProxy {
   }
 
   /**
-   * Cancel all pending requests
+   * Mark all in-flight batches as stopped.  Already-sent requests are
+   * allowed to complete (results will be cached); retries are suppressed.
+   * Queued batches (not yet in _controllers) are handled by
+   * ConcurrencyController.cancelQueued() on the CS side.
    */
   stopAll() {
-    for (const [id, ctrl] of this._controllers) {
-      ctrl.abort();
+    for (const id of this._controllers.keys()) {
+      this._stopped.add(id);
     }
-    this._controllers.clear();
   }
 
   /**
-   * Cleanup on extension suspend
+   * Cleanup on extension suspend — abort all immediately.
    */
   dispose() {
-    this.stopAll();
+    for (const [id, ctrl] of this._controllers) {
+      ctrl.abort();
+      this._stopped.add(id);
+    }
+    this._controllers.clear();
   }
 
   // ------------------------------------------------------------------
