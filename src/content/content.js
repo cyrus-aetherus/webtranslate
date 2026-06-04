@@ -834,19 +834,24 @@ function showConfigToast() {
 /** Auto-start translation if the user previously enabled it. */
 async function maybeAutoStart() {
   try {
-    // Use session storage — scoped to this specific tab, won't bleed to other tabs
     const cfg = await chrome.storage.local.get([_stKey('active'), _stKey('mode')]);
     if (cfg[_stKey('active')] && cfg[_stKey('mode')]) {
-      console.log('[WT] Auto-starting translation in', cfg[_stKey('mode')], 'mode');
-      currentMode = cfg[_stKey('mode')];
-      startTranslation(cfg[_stKey('mode')]);
+      const mode = cfg[_stKey('mode')];
+      currentMode = mode;
+      // Inline mode can auto-start: no user gesture required.
+      // Panel mode needs a user gesture for chrome.sidePanel.open() —
+      // set currentMode so the FAB's Translate starts the right mode.
+      if (mode === 'inline') {
+        console.log('[WT] Auto-starting inline translation');
+        startTranslation('inline');
+      } else {
+        console.log('[WT] Panel mode pending — waiting for user gesture');
+      }
     } else {
-      // Fallback: check local storage for default mode (legacy)
       const localCfg = await chrome.storage.local.get(['defaultMode']);
       currentMode = localCfg.defaultMode || 'inline';
     }
   } catch {
-    // session storage may not be available in some contexts
     try {
       const localCfg = await chrome.storage.local.get(['defaultMode']);
       currentMode = localCfg.defaultMode || 'inline';
