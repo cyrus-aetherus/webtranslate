@@ -31,6 +31,9 @@ export class PanelRenderer {
       return false;
     }
 
+    // Always get a fresh port — the old one may be stale if the panel
+    // was closed and reopened (port.onDisconnect does not always fire).
+    this.dispose();
     this._connect();
     return true;
   }
