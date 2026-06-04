@@ -5,7 +5,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/huanying-dapeng/webtranslate.git"
+    "url": "git+https://github.com/cyrus-aetherus/webtranslate.git"
   },
   "keywords": [
     "browser-extension",
