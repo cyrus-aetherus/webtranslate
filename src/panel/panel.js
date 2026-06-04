@@ -1,8 +1,10 @@
 /**
  * Side Panel script.
- * Communicates with Content Script via chrome.runtime.connect Port.
- * Renders a bilingual list (original + translation).
- * All visible strings are driven by the i18n module.
+ * Slot model: content.js sends INIT_SLOTS with all paragraphs (empty
+ * translations).  We create placeholder divs ordered by sortOrder.
+ * Subsequent BATCH_RESULT messages fill individual slots in-place.
+ * This guarantees correct paragraph order and gives the user instant
+ * feedback that translation has started.
  */
 
 import { init as initI18n, t, tf, applyI18nElements } from '../shared/i18n.js';
@@ -10,13 +12,12 @@ import { init as initI18n, t, tf, applyI18nElements } from '../shared/i18n.js';
 let port = null;
 const listEl = document.getElementById('list');
 const badgeEl = document.getElementById('badge');
-let itemCount = 0;
+let totalSlots = 0;
+let filledSlots = 0;
 
-// Set initial waiting state
 badgeEl.className = 'waiting';
 
 async function bootstrap() {
-  // Resolve locale from storage or navigator.language
   try {
     const stored = await chrome.storage.local.get('wt_language');
     const nav = navigator.language;
@@ -33,15 +34,11 @@ async function bootstrap() {
 bootstrap();
 
 function connect() {
-  // Connect back to SW.  Only one side panel is open at a time,
-  // so we use a fixed port name — the SW relays messages from
-  // content-script PanelRenderer ports to this receiver.
   port = chrome.runtime.connect({ name: 'wt-panel-receiver' });
 
   port.onMessage.addListener((msg) => {
-    if (msg.type === 'BATCH_RESULT') {
-      renderBatch(msg.items);
-    }
+    if (msg.type === 'INIT_SLOTS') initSlots(msg.items);
+    if (msg.type === 'BATCH_RESULT') fillSlots(msg.items);
   });
 
   port.onDisconnect.addListener(() => {
@@ -54,44 +51,65 @@ function connect() {
   badgeEl.className = 'connected';
 }
 
-function renderBatch(items) {
-  // Clear existing items and re-render the entire sorted list.
-  // Content script sends the full accumulated list each time, sorted
-  // by document order — this guarantees paragraph order is correct
-  // regardless of concurrent batch completion order.
-  listEl.querySelectorAll('.item').forEach(el => el.remove());
+function initSlots(items) {
+  listEl.querySelectorAll('.item, .empty').forEach(el => el.remove());
+  totalSlots = items.length;
+  filledSlots = 0;
 
-  // Remove empty placeholder if present
-  const empty = listEl.querySelector('.empty');
-  if (empty) empty.remove();
-
-  itemCount = 0;
+  // Items arrive pre-sorted by sortOrder (0, 1, 2, ...)
   for (const it of items) {
-    itemCount++;
     const div = document.createElement('div');
-    div.className = 'item';
+    div.className = 'item pending';
     div.dataset.id = it.id;
+    div.dataset.sortOrder = it.sortOrder;
     div.innerHTML = `
       <div class="orig">${escapeHtml(it.original)}</div>
-      <div class="trans">${escapeHtml(it.translation)}</div>
-      <div class="actions">
-        <button data-action="copy">${t('panel.copy')}</button>
-        <button data-action="scroll">${t('panel.scroll_to')}</button>
-      </div>
+      <div class="trans"><span class="wt-slot-pending">${t('panel.waiting')}</span></div>
     `;
-
-    div.querySelector('[data-action="copy"]').addEventListener('click', () => {
-      navigator.clipboard.writeText(it.translation);
-    });
-
-    div.querySelector('[data-action="scroll"]').addEventListener('click', () => {
-      port?.postMessage({ type: 'SCROLL_TO', paragraphId: it.id });
-    });
-
     listEl.appendChild(div);
   }
 
-  badgeEl.textContent = tf('panel.translated_count', { count: itemCount });
+  badgeEl.textContent = tf('panel.translated_count', { count: 0 });
+  _updateProgress();
+}
+
+function fillSlots(items) {
+  for (const it of items) {
+    const slot = document.querySelector(`.item[data-sort-order="${it.sortOrder}"]`);
+    if (!slot || !slot.classList.contains('pending')) continue;
+
+    slot.classList.remove('pending');
+    const transEl = slot.querySelector('.trans');
+    if (transEl) transEl.textContent = it.translation;
+
+    // Add action buttons now that translation is ready
+    const actions = document.createElement('div');
+    actions.className = 'actions';
+    actions.innerHTML = `
+      <button data-action="copy">${t('panel.copy')}</button>
+      <button data-action="scroll">${t('panel.scroll_to')}</button>
+    `;
+    actions.querySelector('[data-action="copy"]').addEventListener('click', () => {
+      navigator.clipboard.writeText(it.translation);
+    });
+    actions.querySelector('[data-action="scroll"]').addEventListener('click', () => {
+      port?.postMessage({ type: 'SCROLL_TO', paragraphId: it.id });
+    });
+    slot.appendChild(actions);
+
+    filledSlots++;
+  }
+
+  badgeEl.textContent = tf('panel.translated_count', { count: filledSlots });
+  _updateProgress();
+}
+
+function _updateProgress() {
+  if (totalSlots === 0) return;
+  const pct = Math.round((filledSlots / totalSlots) * 100);
+  badgeEl.textContent = tf('panel.translated_count', { count: filledSlots });
+  // Visual: set a CSS variable so the panel can show a progress bar
+  listEl.style.setProperty('--wt-pct', pct + '%');
 }
 
 function escapeHtml(text) {

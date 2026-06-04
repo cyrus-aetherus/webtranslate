@@ -40,13 +40,18 @@ export class PanelRenderer {
    * @param {{id:string, original:string, translation:string}[]} items
    */
   renderBatch(items) {
-    if (!this._connected) {
-      this._connect();
-    }
-    if (!this.port) return;
-    try {
-      this.port.postMessage({ type: 'BATCH_RESULT', items });
-    } catch { /* port may have disconnected */ }
+    this._post({ type: 'BATCH_RESULT', items });
+  }
+
+  /**
+   * Send the full slot list to the panel so it can render placeholders
+   * for every paragraph BEFORE any translations arrive.  The panel
+   * creates empty slots ordered by sortOrder; subsequent BATCH_RESULT
+   * messages fill them in-place, guaranteeing correct visual order.
+   * @param {{id:string, original:string, sortOrder:number}[]} items
+   */
+  initSlots(items) {
+    this._post({ type: 'INIT_SLOTS', items });
   }
 
   /**
@@ -73,5 +78,11 @@ export class PanelRenderer {
       console.warn('[WT] Port connection failed:', err.message);
       this._connected = false;
     }
+  }
+
+  _post(msg) {
+    if (!this._connected) this._connect();
+    if (!this.port) return;
+    try { this.port.postMessage(msg); } catch { /* panel may have closed */ }
   }
 }
