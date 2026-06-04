@@ -435,12 +435,13 @@
    * @param {Element} el
    * @param {string} fingerprint
    */
-  function markTranslated(el, fingerprint) {
+  function markTranslated(el, fingerprint, paragraphId) {
     if (fingerprint) {
       el.dataset.wtDone = fingerprint.slice(0, 12);
     } else if (!el.dataset.wtDone) {
       el.dataset.wtDone = '1';
     }
+    if (paragraphId) el.dataset.wtPgId = paragraphId;
   }
 
   /**
@@ -2860,6 +2861,13 @@
       if (msg.type === MSG.DOWNLOAD_PROGRESS) {
         updateDownloadProgress(msg);
       }
+      if (msg.type === 'SCROLL_TO') {
+        // Try original paragraph element (stores wtPgId via markTranslated)
+        let el = document.querySelector(`[data-wt-pg-id="${msg.paragraphId}"]`);
+        // Fallback: inline translation block (stores wtId via InlineRenderer)
+        if (!el) el = document.querySelector(`.wt-inline-block[data-wt-id="${msg.paragraphId}"]`);
+        if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+      }
     });
 
     // Watch for API config changes — auto-start translation when user
@@ -2958,6 +2966,7 @@
     for (const item of batch) {
       const cached = cacheManager.get(item.fingerprint);
       if (cached) {
+        markTranslated(item.element, item.fingerprint, item.id);
         if (currentMode === 'inline') {
           inlineRenderer.render(item.element, cached, item.id);
         } else {
@@ -3025,6 +3034,7 @@
       const original = items?.find((u) => u.id === r.id);
       if (!original) continue;
       cacheManager.set(original.fingerprint, r.translation);
+      markTranslated(original.element, original.fingerprint, original.id);
       if (currentMode === 'inline') {
         inlineRenderer.render(original.element, r.translation, original.id);
       } else {
@@ -3235,7 +3245,7 @@
         if (it.element.dataset.wtDone || _pendingFingerprints.has(it.fingerprint)) continue;
         const cached = cacheManager?.get(it.fingerprint);
         if (cached) {
-          markTranslated(it.element, it.fingerprint);
+          markTranslated(it.element, it.fingerprint, it.id);
           if (currentMode === 'inline') {
             inlineRenderer.render(it.element, cached, it.id);
           } else {
@@ -3273,7 +3283,7 @@
           if (currentMode === 'inline') {
             const next = el.nextElementSibling;
             if (next?.classList?.contains('wt-inline-block')) continue;
-            markTranslated(el, fp);
+            markTranslated(el, fp, id);
             inlineRenderer.render(el, cached, id);
           } else {
             // Panel mode: fill cached translation into the matching slot

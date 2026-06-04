@@ -242,6 +242,7 @@ function onBatchReady(batch) {
   for (const item of batch) {
     const cached = cacheManager.get(item.fingerprint);
     if (cached) {
+      markTranslated(item.element, item.fingerprint, item.id);
       if (currentMode === 'inline') {
         inlineRenderer.render(item.element, cached, item.id);
       } else {
@@ -309,6 +310,7 @@ function handleBatchResult(msg) {
     const original = items?.find((u) => u.id === r.id);
     if (!original) continue;
     cacheManager.set(original.fingerprint, r.translation);
+    markTranslated(original.element, original.fingerprint, original.id);
     if (currentMode === 'inline') {
       inlineRenderer.render(original.element, r.translation, original.id);
     } else {
@@ -561,6 +563,7 @@ async function startTranslation(mode = currentMode) {
           inlineRenderer.render(el, cached, id);
         } else {
           // Panel mode: fill cached translation into the matching slot
+          markTranslated(el, fp, id);
           panelRenderer.renderBatch([{ id, original: getTranslatableText(el), translation: cached }]);
         }
       } else if (!el.dataset.wtDone) {
