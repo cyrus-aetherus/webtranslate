@@ -97,7 +97,7 @@ npm run lint     # ESLint
 **技术栈：** Chrome Extension Manifest V3 · 原生 ES2022 · Vite · Vitest · JSZip · DOMPurify · turndown
 
 **文档：**
-- [UI 交互设计文档](docs/ui-interaction-design.md)
+- [UI 交互设计文档](docs/ui-interaction-design-zh.md)
 - [架构图 (English)](docs/architecture-en.md) · [架构图 (中文)](docs/architecture-zh.md)
 
 ---

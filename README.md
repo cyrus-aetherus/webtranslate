@@ -97,7 +97,7 @@ npm run lint     # ESLint
 **Tech Stack:** Chrome Extension Manifest V3 · Vanilla ES2022 · Vite · Vitest · JSZip · DOMPurify · turndown
 
 **Docs:**
-- [UI Interaction Design](docs/ui-interaction-design.md)
+- [UI Interaction Design](docs/ui-interaction-design-en.md)
 - [Architecture (English)](docs/architecture-en.md) · [Architecture (中文)](docs/architecture-zh.md)
 
 ---
