@@ -70,7 +70,7 @@ const HARDCODED_EN_FALLBACK = {
   'fab.switch_to_inline': 'Switch to Inline',
   'fab.switch_to_panel': 'Switch to Panel',
   'fab.retranslate': 'Retranslate',
-  'fab.clear': 'Clear',
+  'fab.clear': 'Hide',
   'fab.download': 'Download Page',
   'fab.settings': 'Settings',
   'fab.resume': 'Resume',
