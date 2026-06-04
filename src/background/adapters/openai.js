@@ -18,7 +18,7 @@
  * @returns {AdapterRequest}
  */
 export function buildRequest(prompt, config, maxTokens) {
-  const base = config.apiUrl.replace(/\/$/, '');
+  const base = config.apiUrl.replace(/\/$/, '').replace(/\/v1$/, '');
   const url = `${base}/v1/chat/completions`;
 
   return {

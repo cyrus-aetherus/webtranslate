@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Documentation Test Page</title>
+<style>
+  body { font-family: monospace; max-width: 900px; margin: 0 auto; padding: 20px; }
+  pre { background: #f4f4f4; padding: 10px; border-radius: 4px; overflow-x: auto; }
+  code { background: #f4f4f4; padding: 2px 4px; }
+  .nav { background: #333; color: #fff; padding: 10px; }
+</style>
+</head>
+<body>
+<div class="nav">Docs API Guides</div>
+<main>
+  <h1>Getting Started</h1>
+  <p>Welcome to the developer documentation. This guide will help you integrate our API in under five minutes.</p>
+  <h2>Installation</h2>
+  <p>Install the package using your favorite package manager:</p>
+  <pre><code>npm install @example/sdk
+const sdk = require('@example/sdk');</code></pre>
+  <h2>Authentication</h2>
+  <p>All API requests must include a valid API key in the Authorization header. You can generate keys from the dashboard.</p>
+  <p>Never commit your API keys to version control. Use environment variables or a secrets manager instead.</p>
+  <h2>Error Handling</h2>
+  <p>The API uses standard HTTP status codes. A 200 indicates success, while 4xx errors indicate client-side issues.</p>
+</main>
+<footer>Documentation © 2026</footer>
+</body>
+</html>

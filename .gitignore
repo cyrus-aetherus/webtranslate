@@ -21,3 +21,7 @@ Thumbs.db
 # Test coverage
 coverage/
 .agent/
+
+# E2E artifacts
+.playwright-mcp/
+e2e-*.png

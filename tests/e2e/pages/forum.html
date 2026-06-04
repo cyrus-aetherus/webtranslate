@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Forum Thread Test Page</title>
+<style>
+  body { font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+  .thread { border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; }
+  .comment { margin-left: 20px; border-left: 3px solid #ccc; padding-left: 10px; margin-top: 10px; }
+  .meta { color: #666; font-size: 12px; }
+</style>
+</head>
+<body>
+<h1>Discussion: Best practices for API design</h1>
+<div class="thread">
+  <div class="meta">u/devguru · 2h ago</div>
+  <p>I've been designing REST APIs for five years and wanted to share some lessons learned about versioning, pagination, and error handling.</p>
+  <p>First, always version your API from day one. Even if you think you won't need it, future you will thank present you.</p>
+</div>
+<div class="comment">
+  <div class="meta">u/newbie · 1h ago</div>
+  <p>Great advice! What about GraphQL vs REST? I've heard mixed opinions.</p>
+</div>
+<div class="comment">
+  <div class="meta">u/devguru · 45m ago</div>
+  <p>GraphQL shines when clients need flexibility, but REST is often simpler to cache and scale. Choose based on your team's expertise and use case.</p>
+</div>
+<div class="thread">
+  <div class="meta">u/skeptic · 3h ago</div>
+  <p>Has anyone actually measured the performance difference? I suspect most claims are anecdotal.</p>
+</div>
+</body>
+</html>

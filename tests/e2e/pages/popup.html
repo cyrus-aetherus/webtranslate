@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebTranslate</title>
+  <style>
+    :root {
+      --bg: #f8f9fa; --surface: #ffffff; --text: #1d1b20; --muted: #79747e;
+      --primary: #6750a4; --primary-light: #eaddff; --on-primary: #ffffff;
+      --success: #386a20; --danger: #b3261e;
+      --border: #e7e0ec; --outline: #cac4d0; --radius: 12px; --nav-w: 108px;
+    }
+    * { box-sizing: border-box; margin:0; padding:0; }
+    body {
+      width: 420px; height: 520px; overflow: hidden;
+      font-family: 'Segoe UI Variable', 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg); color: var(--text); font-size: 13px;
+      display: flex; flex-direction: column;
+    }
+    /* ---- Header ---- */
+    #app-header {
+      padding: 14px 16px; font-size: 16px; font-weight: 600; color: var(--text);
+      background: var(--surface); flex-shrink: 0;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .header-logo {
+      width: 28px; height: 28px; border-radius: 8px;
+      background: var(--primary-light);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .header-title { color: var(--primary); letter-spacing: -.2px; }
+
+    /* ---- Body (nav + panel) ---- */
+    #app-body { display: flex; flex: 1; overflow: hidden; }
+
+    /* ---- Left Nav ---- */
+    #nav {
+      width: var(--nav-w); background: var(--surface); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; padding: 8px 0; flex-shrink: 0;
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 8px; padding: 10px 16px; cursor: pointer;
+      font-size: 12px; font-weight: 500; color: var(--muted); border: none; background: none;
+      transition: all .15s; text-align: left; width: 100%; border-radius: 0 24px 24px 0;
+      margin-right: 8px;
+    }
+    .nav-item:hover { color: var(--primary); background: var(--primary-light); }
+    .nav-item.active { color: var(--primary); background: var(--primary-light); font-weight: 600; }
+    .nav-item .nav-icon { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; }
+    .nav-item .nav-icon svg { display: block; }
+
+    /* ---- Right Panel ---- */
+    #panel { flex: 1; overflow-y: auto; padding: 16px; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ---- Form ---- */
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-weight: 500; margin-bottom: 6px; font-size: 12px; color: var(--muted); }
+    .field input, .field select {
+      width: 100%; padding: 8px 12px; border: 1px solid var(--outline); border-radius: 8px;
+      font-size: 13px; font-family: inherit; color: var(--text);
+      background: var(--surface); transition: border-color .15s;
+    }
+    .field input:focus, .field select:focus {
+      outline: none; border-color: var(--primary); border-width: 2px; padding: 7px 11px;
+    }
+    .field input::placeholder { color: var(--outline); }
+    .field .hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    .field .error { font-size: 11px; color: var(--danger); margin-top: 4px; display: none; }
+    .field.invalid .error { display: block; }
+    .field.invalid input { border-color: var(--danger); }
+    .row { display: flex; gap: 10px; }
+    .row .field { flex: 1; }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 8px 20px; border: 1px solid var(--outline); border-radius: 20px;
+      background: var(--surface); font-size: 12px; font-weight: 500;
+      cursor: pointer; color: var(--primary); transition: background .15s;
+    }
+    .btn:hover { background: var(--primary-light); }
+    .btn.primary {
+      background: var(--primary); color: var(--on-primary); border-color: transparent;
+    }
+    .btn.primary:hover { background: #7965af; }
+    .btn.success {
+      background: var(--primary); color: var(--on-primary); border-color: transparent;
+    }
+    .btn.success:hover { background: #7965af; }
+    .btn:disabled { opacity: 0.38; cursor: not-allowed; }
+    .actions-bar { display: flex; gap: 8px; padding: 12px 0; }
+    #test-result { font-size: 12px; margin-top: 6px; min-height: 18px; }
+    #test-result.ok { color: var(--success); }
+    #test-result.err { color: var(--danger); }
+
+    /* ---- Stats ---- */
+    .stat-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px 16px; margin-bottom: 12px;
+    }
+    .stat-card h3 {
+      font-size: 11px; color: var(--muted); font-weight: 500;
+      margin-bottom: 10px; text-transform: uppercase; letter-spacing: .5px;
+    }
+    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .stat-item { text-align: center; }
+    .stat-item .val { font-size: 20px; font-weight: 600; color: var(--primary); }
+    .stat-item .lbl { font-size: 10px; color: var(--muted); margin-top: 2px; }
+    .stat-full { font-size: 13px; font-weight: 600; color: var(--primary); }
+    .btn-danger { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 11px; font-weight: 500; padding: 4px 0; }
+    .btn-danger:hover { text-decoration: underline; }
+
+    /* ---- Footer ---- */
+    #app-footer {
+      padding: 8px 16px; font-size: 11px; color: var(--muted); text-align: center;
+      border-top: 1px solid var(--border); background: var(--surface); flex-shrink: 0;
+    }
+
+    /* ---- Focus-visible ---- */
+    button:focus-visible, select:focus-visible, input:focus-visible {
+      outline: 2px solid var(--primary); outline-offset: 2px;
+    }
+
+    /* ---- Scrollbar ---- */
+    #panel::-webkit-scrollbar { width: 4px; }
+    #panel::-webkit-scrollbar-track { background: transparent; }
+    #panel::-webkit-scrollbar-thumb { background: var(--outline); border-radius: 2px; }
+  </style>
+  <script type="module" crossorigin src="./popup.js"></script>
+  <link rel="modulepreload" crossorigin href="./chunks/i18n-DqWESLjk.js">
+  <link rel="modulepreload" crossorigin href="./chunks/utils-D67canuh.js">
+</head>
+<body>
+  <header id="app-header">
+    <div class="header-logo">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+        <path d="M2 7V2h5" stroke="#6750a4" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M17 2h5v5" stroke="#6750a4" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M2 17v5h5" stroke="#6750a4" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M17 22h5v-5" stroke="#6750a4" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="12" cy="12" r="6.5" stroke="#6750a4" stroke-width="1.5"/>
+        <path d="M8.5 8.5h7v1.4h-2.8v5.6h-1.4V9.9H8.5z" fill="#6750a4"/>
+      </svg>
+    </div>
+    <span class="header-title">WebTranslate</span>
+  </header>
+  <div id="app-body">
+    <nav id="nav">
+      <button class="nav-item" data-tab="model"><span class="nav-icon"></span> <span data-i18n="popup.nav.model">Model</span></button>
+      <button class="nav-item" data-tab="translation"><span class="nav-icon"></span> <span data-i18n="popup.nav.translation">Translation</span></button>
+      <button class="nav-item" data-tab="settings"><span class="nav-icon"></span> <span data-i18n="popup.nav.settings">Settings</span></button>
+      <button class="nav-item active" data-tab="stats"><span class="nav-icon"></span> <span data-i18n="popup.nav.stats">Statistics</span></button>
+    </nav>
+
+    <div id="panel">
+      <!-- ========== Model Tab ========== -->
+      <div class="tab-panel" id="tab-model">
+        <div class="field">
+          <label data-i18n="popup.apiUrl.label">API URL</label>
+          <input type="text" id="apiUrl" placeholder="https://api.openai.com/v1">
+          <div class="hint" data-i18n="popup.apiUrl.hint">OpenAI-compatible endpoint base URL</div>
+          <div class="error" data-i18n="popup.apiUrl.error">Invalid format</div>
+        </div>
+        <div class="field">
+          <label data-i18n="popup.apiKey.label">API Key</label>
+          <div style="display:flex;gap:6px;">
+            <input type="password" id="apiKey" placeholder="sk-..." style="flex:1;">
+            <button class="btn" id="toggleKey" type="button" data-i18n="popup.apiKey.toggle_show">Show</button>
+          </div>
+          <div class="error" data-i18n="popup.apiKey.error">At least 8 characters required</div>
+        </div>
+        <div class="field">
+          <label data-i18n="popup.model.label">Model</label>
+          <input type="text" id="model" placeholder="gpt-4o / deepseek-chat">
+          <div class="error" data-i18n="popup.model.error">Required</div>
+        </div>
+        <div class="field">
+          <label data-i18n="popup.adapter.label">Adapter</label>
+          <select id="adapter"><option value="openai">OpenAI</option><option value="anthropic">Anthropic</option></select>
+        </div>
+        <div class="actions-bar">
+          <button class="btn primary" id="testBtn" data-i18n="popup.btn.test">Test</button>
+          <button class="btn success" id="saveModelBtn" data-i18n="popup.btn.save">Save</button>
+        </div>
+        <div id="test-result"></div>
+      </div>
+
+      <!-- ========== Translation Tab ========== -->
+      <div class="tab-panel" id="tab-translation">
+        <div class="field">
+          <label data-i18n="popup.sourceLang.label">Source Language</label>
+          <select id="sourceLang">
+            <option value="auto" data-i18n="popup.sourceLang.auto">Auto Detect</option>
+            <option value="en">English</option>
+            <option value="zh-CN">中文</option>
+            <option value="ja">日本語</option>
+            <option value="ko">한국어</option>
+            <option value="fr">Français</option>
+            <option value="de">Deutsch</option>
+            <option value="es">Español</option>
+            <option value="ru">Русский</option>
+          </select>
+        </div>
+        <div class="field">
+          <label data-i18n="popup.targetLang.label">Target Language</label>
+          <select id="targetLang">
+            <option value="zh-CN">中文</option>
+            <option value="en">English</option>
+            <option value="ja">日本語</option>
+            <option value="ko">한국어</option>
+            <option value="fr">Français</option>
+            <option value="de">Deutsch</option>
+            <option value="es">Español</option>
+            <option value="ru">Русский</option>
+          </select>
+        </div>
+        <div class="actions-bar">
+          <button class="btn success" id="saveTranslationBtn" data-i18n="popup.btn.save">Save</button>
+        </div>
+        <div id="translation-result" style="font-size:12px;min-height:18px;"></div>
+      </div>
+
+      <!-- ========== Settings Tab ========== -->
+      <div class="tab-panel" id="tab-settings">
+        <div class="row">
+          <div class="field"><label data-i18n="popup.defaultMode.label">Mode</label><select id="defaultMode"><option value="inline">Inline</option><option value="panel">Panel</option></select></div>
+          <div class="field"><label data-i18n="popup.language.label">Language</label><select id="language"><option value="en">English</option><option value="zh-CN">中文</option></select></div>
+        </div>
+        <div class="row">
+          <div class="field"><label data-i18n="popup.concurrency.label">Concurrency</label><input type="number" id="concurrency" min="1" max="10" value="3"></div>
+          <div class="field"><label data-i18n="popup.maxBatchChars.label">Max Chars/Batch</label><input type="number" id="maxBatchChars" min="500" max="5000" value="800" step="100"></div>
+        </div>
+        <div class="actions-bar">
+          <button class="btn success" id="saveSettingsBtn" data-i18n="popup.btn.save">Save</button>
+        </div>
+        <div id="settings-result" style="font-size:12px;min-height:18px;"></div>
+        <div class="actions-bar" style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px;">
+          <button class="btn" id="exportBtn" data-i18n="popup.btn.export">Export</button>
+          <button class="btn" id="importBtn" data-i18n="popup.btn.import">Import</button>
+        </div>
+        <input type="file" id="importFile" accept=".json" style="display:none;">
+      </div>
+
+      <!-- ========== Statistics Tab ========== -->
+      <div class="tab-panel active" id="tab-stats">
+        <div class="stat-card">
+          <h3 data-i18n="popup.stats.all_time">All Time</h3>
+          <div class="stat-grid">
+            <div class="stat-item"><div class="val" id="statCalls">-</div><div class="lbl" data-i18n="popup.stats.api_calls">API Calls</div></div>
+            <div class="stat-item"><div class="val" id="statSegments">-</div><div class="lbl" data-i18n="popup.stats.segments">Segments</div></div>
+            <div class="stat-item"><div class="val" id="statIn">-</div><div class="lbl" data-i18n="popup.stats.tokens_in">Tokens In</div></div>
+            <div class="stat-item"><div class="val" id="statOut">-</div><div class="lbl" data-i18n="popup.stats.tokens_out">Tokens Out</div></div>
+          </div>
+          <div style="margin-top:8px;text-align:center;"><span class="stat-full" id="statCost">-</span><span style="font-size:10px;color:var(--muted);" data-i18n="popup.stats.est_cost"> est. cost</span></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <button class="btn" id="refreshStats" data-i18n="popup.stats.refresh">Refresh</button>
+          <button class="btn-danger" id="clearStats" data-i18n="popup.stats.clear">Clear All Stats</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="app-footer" data-i18n="popup.footer">API Key stored locally · never uploaded to third parties</div>
+
+</body>
+</html>

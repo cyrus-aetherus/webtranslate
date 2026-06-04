@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SPA Dynamic Content Test</title>
+<style>
+  body { font-family: sans-serif; max-width: 700px; margin: 0 auto; padding: 20px; }
+  #content { min-height: 200px; }
+  button { padding: 10px 20px; margin: 5px; }
+</style>
+</head>
+<body>
+<h1>Dynamic Content Loader</h1>
+<button id="loadMore">Load More Content</button>
+<div id="content">
+  <p>Initial paragraph that is present on page load. This should be extracted immediately.</p>
+</div>
+<script>
+  let loadCount = 0;
+  document.getElementById('loadMore').addEventListener('click', () => {
+    loadCount++;
+    const p = document.createElement('p');
+    p.textContent = `Dynamically loaded paragraph number ${loadCount}. This text was added after the initial page load via JavaScript.`;
+    document.getElementById('content').appendChild(p);
+  });
+</script>
+</body>
+</html>

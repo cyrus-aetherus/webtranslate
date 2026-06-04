@@ -1,0 +1,24 @@
+/**
+ * WebTranslate Content Script base styles.
+ * Minimal file — FAB & menu styles are set via inline JS.
+ */
+
+/* ---- FAB base: positioning only (colors via inline) ---- */
+#wt-fab {
+  position: fixed !important;
+  z-index: 2147483647 !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  cursor: pointer !important;
+}
+
+/* ---- Inline translation blocks ---- */
+.wt-inline-block {
+  line-height: 1.6 !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif !important;
+}
+
+/* ---- Pending spinner ---- */
+.wt-pending {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif !important;
+}

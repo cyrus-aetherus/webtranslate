@@ -24,6 +24,8 @@
     "lint": "eslint src/"
   },
   "devDependencies": {
+    "@rollup/plugin-commonjs": "^29.0.3",
+    "@rollup/plugin-node-resolve": "^16.0.3",
     "eslint": "^8.0.0",
     "jimp": "^1.6.1",
     "jsdom": "^29.1.1",
