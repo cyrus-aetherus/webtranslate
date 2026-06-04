@@ -4,8 +4,7 @@
   "version": "1.0.0",
   "description": "LLM-powered webpage translation & download",
   "minimum_chrome_version": "114",
-  "permissions": ["activeTab", "storage", "downloads", "scripting"],
-  "optional_permissions": ["sidePanel"],
+  "permissions": ["activeTab", "storage", "downloads", "scripting", "sidePanel"],
   "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "src/background/sw.js",
