@@ -98,6 +98,8 @@ export class InlineRenderer {
 
   clearAll() {
     document.querySelectorAll('.wt-inline-block, .wt-pending').forEach(e => e.remove());
+    // Remove wtDone markers so elements can be re-processed on next translation
+    document.querySelectorAll('[data-wt-done]').forEach(el => { delete el.dataset.wtDone; });
   }
 
   update(paragraphId, newTranslation) {

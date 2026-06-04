@@ -278,18 +278,17 @@ export class FabComponent {
     this._currentState = state;
     this._currentMode = mode;
 
-    // Remove old menu items
-    if (this._menuEl) {
-      const oldItems = this.menuEl.querySelectorAll('.wt-fab-menu-item');
+    // Remove old menu items from the menu container (where they actually live)
+    if (this._menuContainer) {
+      const oldItems = this._menuContainer.querySelectorAll('.wt-fab-menu-item');
       oldItems.forEach(el => el.remove());
     }
     this._labelEls = [];
 
-    // Build new items
+    // Build new items — append to _menuContainer, NOT to menuEl (backdrop)
     const items = getMenuItems(state, mode);
-    if (!this._menuEl) return;
+    if (!this._menuContainer) return;
 
-    const wrap = this.menuEl;
     const activators = this._buildActivators(items);
 
     items.forEach((it, i) => {
@@ -300,11 +299,11 @@ export class FabComponent {
       d.style.opacity = this._open ? '1' : '0';
       d.style.transform = this._open ? 'scale(1)' : 'scale(0.3)';
       d.addEventListener('click', e => { e.stopPropagation(); this._close(); activators[i](); });
-      wrap.appendChild(d);
+      this._menuContainer.appendChild(d);
       this._labelEls.push(d.querySelector('.wt-mi-label'));
     });
 
-    this._menuItems = wrap.querySelectorAll('.wt-fab-menu-item');
+    this._menuItems = this._menuContainer.querySelectorAll('.wt-fab-menu-item');
 
     // Re-position if open
     if (this._open) {

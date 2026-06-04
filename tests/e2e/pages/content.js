@@ -1082,6 +1082,11 @@
 
     'fab.translate_inline': 'Inline Translate',
     'fab.translate_panel': 'Panel Translate',
+    'fab.translate': 'Translate',
+    'fab.switch_to_inline': 'Switch to Inline',
+    'fab.switch_to_panel': 'Switch to Panel',
+    'fab.retranslate': 'Retranslate',
+    'fab.clear': 'Clear',
     'fab.download': 'Download Page',
     'fab.settings': 'Settings',
     'fab.stop': 'Stop',
@@ -1267,6 +1272,8 @@
 
     clearAll() {
       document.querySelectorAll('.wt-inline-block, .wt-pending').forEach(e => e.remove());
+      // Remove wtDone markers so elements can be re-processed on next translation
+      document.querySelectorAll('[data-wt-done]').forEach(el => { delete el.dataset.wtDone; });
     }
 
     update(paragraphId, newTranslation) {
@@ -1364,6 +1371,12 @@
    *   White surface, subtle shadows, purple primary (#6750a4)
    *   Pill-shaped buttons (20px radius), 12px card corners
    *   Compact radial menu with clean labels & SVG line icons
+   *   Context-aware dynamic menu — items change based on translation state
+   *
+   * Lifecycle: IDLE → TRANSLATING → PAUSED
+   *   IDLE:         [Translate] [Panel]   Download, Settings
+   *   TRANSLATING:  [Stop]       [Switch] Download, Settings
+   *   PAUSED:       [Translate]  [Retranslate] [Clear] Download, Settings
    */
 
   const SIZE = 44;
@@ -1389,7 +1402,7 @@
 #wt-fab.wt-idle .wt-fab-ring{stroke:#cac4d0;fill:none;}
 #wt-fab.wt-idle .wt-fab-bracket{stroke:#cac4d0;fill:none;}
 
-/* ---- ACTIVE ---- */
+/* ---- ACTIVE (TRANSLATING) ---- */
 #wt-fab.wt-active{background:#eaddff;}
 #wt-fab.wt-active .wt-fab-t{fill:#6750a4;}
 #wt-fab.wt-active .wt-fab-ring{stroke:#6750a4;fill:none;}
@@ -1407,10 +1420,16 @@
 #wt-fab.wt-error .wt-fab-ring{stroke:#b3261e;fill:none;}
 #wt-fab.wt-error .wt-fab-bracket{stroke:#b3261e;fill:none;}
 
-/* Progress ring */
-.wt-fab-ring-progress{position:absolute;inset:-3px;}
-.wt-fab-ring-progress circle{fill:none;stroke:#6750a4;stroke-width:2;stroke-linecap:round;
-  transform:rotate(-90deg);transform-origin:50% 50%;transition:stroke-dashoffset .4s ease;}
+/* ---- Mode badge ---- */
+#wt-fab .wt-mode-badge{position:absolute;top:-2px;right:-2px;
+  width:18px;height:18px;border-radius:50%;
+  font-size:9px;font-weight:700;color:#fff;
+  display:none;align-items:center;justify-content:center;
+  box-shadow:0 1px 3px rgba(0,0,0,.2);}
+#wt-fab.wt-idle .wt-mode-badge{background:#6750a4;}
+#wt-fab.wt-active .wt-mode-badge{background:#6750a4;}
+#wt-fab.wt-paused .wt-mode-badge{background:#795600;}
+#wt-fab.wt-error .wt-mode-badge{background:#b3261e;}
 
 /* ---- Menu items ---- */
 .wt-fab-menu-item{position:absolute;display:flex;align-items:center;gap:8px;
@@ -1426,9 +1445,21 @@
 .wt-fab-menu-item .wt-mi-label{background:#fff;padding:5px 12px;border-radius:16px;
   border:1px solid #e7e0ec;font-weight:500;font-size:12px;color:#1d1b20;
   box-shadow:0 1px 3px rgba(0,0,0,.06);}
+
+/* Primary action (main button — larger, emphasized) */
+.wt-fab-menu-item.wt-primary .wt-mi-dot{width:42px;height:42px;
+  background:#eaddff;border-color:#6750a4;}
+.wt-fab-menu-item.wt-primary .wt-mi-label{font-weight:600;color:#6750a4;}
+.wt-fab-menu-item.wt-primary:hover .wt-mi-dot{background:#6750a4;border-color:#6750a4;}
+.wt-fab-menu-item.wt-primary:hover .wt-mi-dot svg{stroke:#fff;}
+.wt-fab-menu-item.wt-primary:hover .wt-mi-label{background:#6750a4;color:#fff;}
+.wt-fab-menu-item.wt-primary.wt-stop .wt-mi-dot{background:#f9dedc;border-color:#b3261e;}
+.wt-fab-menu-item.wt-primary.wt-stop .wt-mi-label{color:#b3261e;font-weight:600;}
+.wt-fab-menu-item.wt-primary.wt-stop:hover .wt-mi-dot{background:#b3261e;border-color:#b3261e;}
+.wt-fab-menu-item.wt-primary.wt-stop:hover .wt-mi-dot svg{stroke:#fff;}
+.wt-fab-menu-item.wt-primary.wt-stop:hover .wt-mi-label{background:#b3261e;color:#fff;}
+
 .wt-fab-menu-item.wt-active-mode .wt-mi-dot{background:#eaddff;border-color:#6750a4;}
-.wt-fab-menu-item.wt-stop .wt-mi-dot{border-color:#f2b8b5;}
-.wt-fab-menu-item.wt-stop:hover .wt-mi-dot{background:#f9dedc;}
 
 /* Focus-visible */
 #wt-fab:focus-visible{outline:2px solid #6750a4;outline-offset:3px;}
@@ -1444,7 +1475,7 @@
   <path class="wt-fab-t" d="M8.5 8.5h7v1.4h-2.8v5.6h-1.4V9.9H8.5z"/>
 </svg>`;
 
-  // SVG line icons for radial menu (replacing emoji)
+  // SVG line icons for radial menu
   const MENU_ICONS = {
     translate: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#49454f" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
     <path d="M5 8l6 6"/><path d="M4 14l6-6 2-3"/>
@@ -1472,36 +1503,92 @@
     <line x1="18" y1="6" x2="6" y2="18"/>
     <line x1="6" y1="6" x2="18" y2="18"/>
   </svg>`,
+    retranslate: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#49454f" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="23 4 23 10 17 10"/>
+    <polyline points="1 20 1 14 7 14"/>
+    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+  </svg>`,
+    clear: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#49454f" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="3 6 5 6 21 6"/>
+    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+  </svg>`,
   };
 
-  const MENU_ITEMS = [
-    { icon: MENU_ICONS.translate, i18nKey: 'fab.translate_inline', cls: 'wt-inline' },
-    { icon: MENU_ICONS.panel,     i18nKey: 'fab.translate_panel', cls: 'wt-panel' },
-    { icon: MENU_ICONS.download,  i18nKey: 'fab.download',       cls: 'wt-download' },
-    { icon: MENU_ICONS.settings,  i18nKey: 'fab.settings',       cls: 'wt-settings' },
-    { icon: MENU_ICONS.stop,      i18nKey: 'fab.stop',           cls: 'wt-stop' },
-  ];
+  /**
+   * Build the menu item list based on current state and mode.
+   * @param {string} state - 'IDLE' | 'TRANSLATING' | 'PAUSED' | 'ERROR'
+   * @param {string} mode - 'inline' | 'panel'
+   * @returns {{icon:string, i18nKey:string, cls:string, primary:boolean}[]}
+   */
+  function getMenuItems(state, mode) {
+    switch (state) {
+      case 'IDLE': {
+        const otherMode = mode === 'panel' ? 'inline' : 'panel';
+        const otherLabel = mode === 'panel' ? 'fab.translate_inline' : 'fab.translate_panel';
+        return [
+          { icon: MENU_ICONS.translate, i18nKey: 'fab.translate', cls: 'wt-translate', primary: true },
+          { icon: MENU_ICONS.panel, i18nKey: otherLabel, cls: `wt-switch-${otherMode}`, primary: false },
+          { icon: MENU_ICONS.download, i18nKey: 'fab.download', cls: 'wt-download', primary: false },
+          { icon: MENU_ICONS.settings, i18nKey: 'fab.settings', cls: 'wt-settings', primary: false },
+        ];
+      }
+      case 'TRANSLATING':
+      case 'SCANNING': {
+        const otherMode = mode === 'panel' ? 'inline' : 'panel';
+        const switchLabel = mode === 'panel' ? 'fab.switch_to_inline' : 'fab.switch_to_panel';
+        const switchIcon = mode === 'panel' ? MENU_ICONS.translate : MENU_ICONS.panel;
+        return [
+          { icon: MENU_ICONS.stop, i18nKey: 'fab.stop', cls: 'wt-stop', primary: true },
+          { icon: switchIcon, i18nKey: switchLabel, cls: `wt-switch-${otherMode}`, primary: false },
+          { icon: MENU_ICONS.download, i18nKey: 'fab.download', cls: 'wt-download', primary: false },
+          { icon: MENU_ICONS.settings, i18nKey: 'fab.settings', cls: 'wt-settings', primary: false },
+        ];
+      }
+      case 'PAUSED': {
+        return [
+          { icon: MENU_ICONS.translate, i18nKey: 'fab.translate', cls: 'wt-translate', primary: true },
+          { icon: MENU_ICONS.retranslate, i18nKey: 'fab.retranslate', cls: 'wt-retranslate', primary: false },
+          { icon: MENU_ICONS.clear, i18nKey: 'fab.clear', cls: 'wt-clear', primary: false },
+          { icon: MENU_ICONS.download, i18nKey: 'fab.download', cls: 'wt-download', primary: false },
+          { icon: MENU_ICONS.settings, i18nKey: 'fab.settings', cls: 'wt-settings', primary: false },
+        ];
+      }
+      case 'ERROR':
+      default: {
+        return [
+          { icon: MENU_ICONS.translate, i18nKey: 'fab.translate', cls: 'wt-translate', primary: true },
+          { icon: MENU_ICONS.clear, i18nKey: 'fab.clear', cls: 'wt-clear', primary: false },
+          { icon: MENU_ICONS.download, i18nKey: 'fab.download', cls: 'wt-download', primary: false },
+          { icon: MENU_ICONS.settings, i18nKey: 'fab.settings', cls: 'wt-settings', primary: false },
+        ];
+      }
+    }
+  }
 
   class FabComponent {
     constructor(opts = {}) {
-      this.onTranslateInline = opts.onTranslateInline ?? (() => {});
-      this.onTranslatePanel   = opts.onTranslatePanel   ?? (() => {});
-      this.onDownload         = opts.onDownload         ?? (() => {});
-      this.onSettings         = opts.onSettings         ?? (() => {});
-      this.onStop             = opts.onStop             ?? (() => {});
+      this.onTranslate   = opts.onTranslate   ?? (() => {});
+      this.onPanel        = opts.onPanel        ?? (() => {});
+      this.onDownload     = opts.onDownload     ?? (() => {});
+      this.onSettings     = opts.onSettings     ?? (() => {});
+      this.onStop         = opts.onStop         ?? (() => {});
+      this.onSwitchMode   = opts.onSwitchMode   ?? (() => {});
+      this.onRetranslate  = opts.onRetranslate  ?? (() => {});
+      this.onClear        = opts.onClear        ?? (() => {});
 
-      this.el = null; this.menuEl = null; this._ringEl = null;
+      this.el = null; this.menuEl = null; this._badgeEl = null;
       this._open = false; this._dragging = false; this._longTimer = null;
       this._pos = { x: 0, y: 0 }; this._offset = { x: 0, y: 0 }; this._start = { x: 0, y: 0 };
       this._boundMove = this._onMove.bind(this); this._boundUp = this._onUp.bind(this);
-      this._labelEls = [];
+      this._labelEls = []; this._menuItems = null;
+      this._currentState = 'IDLE'; this._currentMode = 'inline';
     }
 
     mount() {
       this._pos = { x: innerWidth - SIZE - 24, y: innerHeight - SIZE - 32 };
       this._injectStyles();
       this._createFab();
-      this._createMenu();
+      this._createMenu('IDLE', 'inline');
       document.body.appendChild(this.el);
       document.body.appendChild(this.menuEl);
       this._loadPosition();
@@ -1512,7 +1599,8 @@
     /** Re-read i18n labels and update menu text. Call after i18n.init() or language change. */
     updateLabels(t) {
       this._labelEls.forEach((el, i) => {
-        const key = MENU_ITEMS[i].i18nKey;
+        const key = el.dataset?.wtI18nKey;
+        if (!key) return;
         const text = t(key);
         if (text && text !== key) el.textContent = text;
       });
@@ -1521,13 +1609,88 @@
     highlightMode(mode) {
       this.menuEl?.querySelectorAll('.wt-fab-menu-item').forEach(e => e.classList.remove('wt-active-mode'));
       if (!mode) return;
-      const sel = mode === 'panel' ? '.wt-panel' : '.wt-inline';
+      const sel = mode === 'panel' ? '.wt-switch-panel' : '.wt-switch-inline';
       this.menuEl?.querySelector(sel)?.classList.add('wt-active-mode');
     }
 
     setState(s) {
       this.el?.classList.remove('wt-idle', 'wt-active', 'wt-paused', 'wt-error');
       this.el?.classList.add('wt-' + s);
+    }
+
+    /**
+     * Update the badge on the FAB showing current mode ('I' or 'P').
+     * @param {string} mode - 'inline' | 'panel'
+     */
+    setModeBadge(mode) {
+      if (!this._badgeEl) return;
+      if (mode === 'panel') {
+        this._badgeEl.textContent = 'P';
+        this._badgeEl.style.display = 'flex';
+      } else if (mode === 'inline') {
+        this._badgeEl.textContent = 'I';
+        this._badgeEl.style.display = 'flex';
+      } else {
+        this._badgeEl.style.display = 'none';
+      }
+    }
+
+    /**
+     * Rebuild the menu for a new state / mode. The FAB must already be mounted.
+     * @param {string} state
+     * @param {string} mode
+     */
+    updateMenu(state, mode) {
+      this._currentState = state;
+      this._currentMode = mode;
+
+      // Remove old menu items from the menu container (where they actually live)
+      if (this._menuContainer) {
+        const oldItems = this._menuContainer.querySelectorAll('.wt-fab-menu-item');
+        oldItems.forEach(el => el.remove());
+      }
+      this._labelEls = [];
+
+      // Build new items — append to _menuContainer, NOT to menuEl (backdrop)
+      const items = getMenuItems(state, mode);
+      if (!this._menuContainer) return;
+
+      const activators = this._buildActivators(items);
+
+      items.forEach((it, i) => {
+        const d = document.createElement('div');
+        d.className = `wt-fab-menu-item ${it.cls}`;
+        if (it.primary) d.classList.add('wt-primary');
+        d.innerHTML = `<span class="wt-mi-dot">${it.icon}</span><span class="wt-mi-label" data-wt-i18n-key="${it.i18nKey}">${it.i18nKey}</span>`;
+        d.style.opacity = this._open ? '1' : '0';
+        d.style.transform = this._open ? 'scale(1)' : 'scale(0.3)';
+        d.addEventListener('click', e => { e.stopPropagation(); this._close(); activators[i](); });
+        this._menuContainer.appendChild(d);
+        this._labelEls.push(d.querySelector('.wt-mi-label'));
+      });
+
+      this._menuItems = this._menuContainer.querySelectorAll('.wt-fab-menu-item');
+
+      // Re-position if open
+      if (this._open) {
+        this._positionMenuItems();
+      }
+    }
+
+    _buildActivators(items) {
+      return items.map(it => {
+        switch (it.cls) {
+          case 'wt-translate': return this.onTranslate;
+          case 'wt-switch-inline': return this.onSwitchMode;
+          case 'wt-switch-panel': return this.onSwitchMode;
+          case 'wt-stop': return this.onStop;
+          case 'wt-retranslate': return this.onRetranslate;
+          case 'wt-clear': return this.onClear;
+          case 'wt-download': return this.onDownload;
+          case 'wt-settings': return this.onSettings;
+          default: return () => {};
+        }
+      });
     }
 
     // ---- internal ------------------------------------------------------------
@@ -1543,6 +1706,12 @@
       btn.id = 'wt-fab'; btn.className = 'wt-idle'; btn.tabIndex = 0;
       btn.innerHTML = SVG_ICON;
       btn.title = 'WebTranslate';
+      // Mode badge
+      const badge = document.createElement('span');
+      badge.className = 'wt-mode-badge';
+      badge.textContent = 'I';
+      btn.appendChild(badge);
+      this._badgeEl = badge;
       btn.addEventListener('mousedown', e => this._onDown(e));
       btn.addEventListener('touchstart', e => this._onTouch(e), { passive: false });
       btn.addEventListener('click', e => { if (!this._dragging) { e.stopPropagation(); this._toggle(); } });
@@ -1550,38 +1719,56 @@
       this.el = btn;
     }
 
-    _createMenu() {
+    _createMenu(state, mode) {
       const wrap = document.createElement('div'); wrap.id = 'wt-fab-backdrop';
-      const menu = document.createElement('div'); menu.style.cssText = 'position:fixed;pointer-events:none;z-index:2147483647;';
+      const menu = document.createElement('div');
+      menu.style.cssText = 'position:fixed;pointer-events:none;z-index:2147483647;';
       wrap.appendChild(menu);
-      const acts = [this.onTranslateInline, this.onTranslatePanel, this.onDownload, this.onSettings, this.onStop];
-      MENU_ITEMS.forEach((it, i) => {
-        const d = document.createElement('div'); d.className = `wt-fab-menu-item ${it.cls}`;
-        d.innerHTML = `<span class="wt-mi-dot">${it.icon}</span><span class="wt-mi-label">${it.i18nKey}</span>`;
+      wrap.addEventListener('click', () => this._close());
+      this.menuEl = wrap; this._menuContainer = menu;
+      // Build initial items
+      const items = getMenuItems(state, mode);
+      const activators = this._buildActivators(items);
+      items.forEach((it, i) => {
+        const d = document.createElement('div');
+        d.className = `wt-fab-menu-item ${it.cls}`;
+        if (it.primary) d.classList.add('wt-primary');
+        d.innerHTML = `<span class="wt-mi-dot">${it.icon}</span><span class="wt-mi-label" data-wt-i18n-key="${it.i18nKey}">${it.i18nKey}</span>`;
         d.style.opacity = '0'; d.style.transform = 'scale(0.3)';
-        d.addEventListener('click', e => { e.stopPropagation(); this._close(); acts[i](); });
-        menu.appendChild(d);
+        d.addEventListener('click', e => { e.stopPropagation(); this._close(); activators[i](); });
+        this._menuContainer.appendChild(d);
         this._labelEls.push(d.querySelector('.wt-mi-label'));
       });
-      wrap.addEventListener('click', () => this._close());
-      this.menuEl = wrap; this._menuItems = menu.querySelectorAll('.wt-fab-menu-item');
+      this._menuItems = this._menuContainer.querySelectorAll('.wt-fab-menu-item');
     }
 
-    _toggle() { this._open ? this._close() : this._openMenu(); }
-    _openMenu() {
-      this._open = true; const r = this.el.getBoundingClientRect();
-      const cx = r.left + r.width / 2, cy = r.top + r.height / 2, N = this._menuItems.length, R = 130;
+    _positionMenuItems() {
+      if (!this._menuItems?.length) return;
+      const r = this.el.getBoundingClientRect();
+      const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      const N = this._menuItems.length;
+      // Dynamic radius: primary buttons get more spacing
+      const R = N >= 5 ? 155 : 140;
+
       this._menuItems.forEach((el, i) => {
         const a = Math.PI + (i - (N - 1) / 2) * (Math.PI / (N + 2));
         el.style.left = (cx + Math.cos(a) * R - 18) + 'px';
         el.style.top  = (cy + Math.sin(a) * R - 18) + 'px';
         el.style.opacity = '1'; el.style.transform = 'scale(1)';
       });
+    }
+
+    _toggle() { this._open ? this._close() : this._openMenu(); }
+    _openMenu() {
+      this._open = true;
+      this._positionMenuItems();
       this.menuEl.classList.add('open');
     }
     _close() {
       this._open = false; this.menuEl.classList.remove('open');
-      this._menuItems.forEach(e => { e.style.opacity = '0'; e.style.transform = 'scale(0.3)'; });
+      if (this._menuItems) {
+        this._menuItems.forEach(e => { e.style.opacity = '0'; e.style.transform = 'scale(0.3)'; });
+      }
     }
 
     _onDown(e) { if (e.button) return; this._startDrag(e.clientX, e.clientY); document.addEventListener('mousemove', this._boundMove); document.addEventListener('mouseup', this._boundUp); }
@@ -1598,8 +1785,6 @@
       if (!chrome.storage?.onChanged) return;
       this._storageListener = (changes, area) => {
         if (area !== 'local' || !changes.wt_language) return;
-        // Language changed — caller should re-init i18n and call updateLabels()
-        // We fire a custom event so content.js can coordinate
         window.dispatchEvent(new CustomEvent('wt-language-changed', { detail: changes.wt_language.newValue }));
       };
       chrome.storage.onChanged.addListener(this._storageListener);
@@ -2524,14 +2709,29 @@
     // --- Phase 1: Mount FAB immediately (synchronous, before any await) ---
     // This ensures the user sees the button even if async steps hang.
     fabComponent = new FabComponent({
-      onTranslateInline: () => toggleTranslation('inline'),
-      onTranslatePanel: () => toggleTranslation('panel'),
+      onTranslate: () => {
+        const st = stateManager?.get();
+        if (st === State.TRANSLATING || st === State.SCANNING) return;
+        if (st === State.PAUSED) startTranslation(currentMode);
+        else startTranslation(currentMode || 'inline');
+      },
+      onPanel: () => {
+        const st = stateManager?.get();
+        if (st === State.TRANSLATING || st === State.SCANNING) return;
+        startTranslation('panel');
+      },
+      onSwitchMode: () => {
+        const to = currentMode === 'panel' ? 'inline' : 'panel';
+        switchMode(to);
+      },
       onDownload: () => handleDownload(),
       onSettings: () => {
         try { chrome.action?.openPopup?.(); } catch (e) {}
         try { chrome.runtime.sendMessage({ type: MSG.OPEN_PANEL }); } catch {}
       },
       onStop: () => stopTranslation(),
+      onRetranslate: () => retranslate(currentMode),
+      onClear: () => clearTranslations(),
     });
     fabComponent.mount(); // creates FAB immediately; loads saved position in background
 
@@ -2558,7 +2758,7 @@
 
     stateManager = new StateManager();
     stateManager.onChange((to, from) => {
-      updateFabIcon(to);
+      updateFabState(to);
       if (to === State.PAUSED && from === State.TRANSLATING) {
         concurrencyController.cancelQueued();
       }
@@ -2617,15 +2817,35 @@
     console.log(`[WebTranslate] Content script initialized (tab=${TAB_ID})`);
   }
 
-  function updateFabIcon(to) {
+  function updateFabState(to, from) {
     if (!fabComponent) return;
-    // Map state-machine states to FAB visual states
+    // Map state-machine states to FAB visual states + rebuild menu context
     switch (to) {
       case State.TRANSLATING:
-      case State.SCANNING:  fabComponent.setState('active');  break;
-      case State.PAUSED:    fabComponent.setState('paused');  break;
-      case State.ERROR:     fabComponent.setState('error');   break;
-      default:              fabComponent.setState('idle');    break;
+      case State.SCANNING:
+        fabComponent.setState('active');
+        fabComponent.setModeBadge(currentMode);
+        fabComponent.updateMenu('TRANSLATING', currentMode);
+        fabComponent.updateLabels(t);
+        break;
+      case State.PAUSED:
+        fabComponent.setState('paused');
+        fabComponent.setModeBadge(null); // hide badge when paused
+        fabComponent.updateMenu('PAUSED', currentMode);
+        fabComponent.updateLabels(t);
+        break;
+      case State.ERROR:
+        fabComponent.setState('error');
+        fabComponent.setModeBadge(null);
+        fabComponent.updateMenu('ERROR', currentMode);
+        fabComponent.updateLabels(t);
+        break;
+      default:
+        fabComponent.setState('idle');
+        fabComponent.setModeBadge(currentMode);
+        fabComponent.updateMenu('IDLE', currentMode);
+        fabComponent.updateLabels(t);
+        break;
     }
   }
 
@@ -2639,13 +2859,13 @@
     } catch (err) {
       console.error('[WT] Download failed:', err);
       fabComponent?.setState('error');
-      setTimeout(() => updateFabIcon(stateManager.get()), 2000);
+      setTimeout(() => updateFabState(stateManager.get()), 2000);
     }
   }
 
   function updateDownloadProgress(msg) {
     if (msg.stage === 'done') {
-      setTimeout(() => updateFabIcon(stateManager.get()), 2000);
+      setTimeout(() => updateFabState(stateManager.get()), 2000);
     }
   }
 
@@ -2748,17 +2968,7 @@
   // Translation start / stop
   // ------------------------------------------------------------------
 
-  /** Toggle translation on/off.  If IDLE → start; if active → stop. */
-  function toggleTranslation(mode) {
-    const st = stateManager.get();
-    if (st === State.IDLE) {
-      startTranslation(mode);
-    } else {
-      stopTranslation();
-    }
-  }
-
-  /** Stop translation, clean up all observers & timers, reset state. */
+  /** Stop translation, clean up all observers & timers, transition to PAUSED. */
   function stopTranslation() {
     batchCollector?.stop();
     observerManager?.stop();
@@ -2768,18 +2978,57 @@
     _pendingBatches.clear();
     _onBatchDone = null;
     chrome.runtime.sendMessage({ type: MSG.STOP_ALL, tabId: TAB_ID || 0 });
-    chrome.storage.local.set({ wt_active: false }).catch(() => {});
-    stateManager?.transition(State.IDLE);
+    chrome.storage.session.set({ wt_active: false }).catch(() => {});
+    // Transition to PAUSED instead of IDLE — keeps translated DOM visible,
+    // allows user to Clear, Retranslate, or Resume.
+    stateManager?.transition(State.PAUSED);
     fabComponent?.highlightMode(null);
-    fabComponent?.setState('idle');
+    fabComponent?.setState('paused');
     panelRenderer?.dispose();
+  }
+
+  /** Clear all inline translation blocks from DOM, keep cache, go IDLE. */
+  function clearTranslations() {
+    inlineRenderer?.clearAll(); // also clears wtDone markers
+    stateManager?.transition(State.IDLE);
+    fabComponent?.setState('idle');
+  }
+
+  /** Clear DOM + cache, then restart translation with fresh API calls. */
+  function retranslate(mode) {
+    inlineRenderer?.clearAll();
+    cacheManager?.clear();
+    // Clear pending state
+    _pendingFingerprints.clear();
+    _pendingBatches.clear();
+    _onBatchDone = null;
+    stateManager?.transition(State.IDLE);
+    startTranslation(mode);
+  }
+
+  /** Switch from Inline to Panel or vice versa without stopping translation. */
+  function switchMode(to) {
+    // Stop current mode
+    batchCollector?.stop();
+    observerManager?.stop();
+    concurrencyController?.cancelQueued();
+    if (window._wtDisposeScroll) { window._wtDisposeScroll.forEach(fn => fn()); window._wtDisposeScroll = []; }
+    _pendingFingerprints.clear();
+    _pendingBatches.clear();
+    _onBatchDone = null;
+    chrome.runtime.sendMessage({ type: MSG.STOP_ALL, tabId: TAB_ID || 0 });
+    stateManager.transition(State.IDLE);
+    panelRenderer?.dispose();
+    // Start new mode — cached paragraphs will render instantly
+    startTranslation(to);
   }
 
   async function startTranslation(mode = currentMode) {
     currentMode = mode;
 
     // Persist active state so translation auto-starts on next visit
-    chrome.storage.local.set({ wt_active: true, wt_autoMode: mode }).catch(() => {});
+    // Use session storage — scoped to this tab/window, won't auto-start in new tabs.
+    chrome.storage.session.set({ wt_active: true, wt_autoMode: mode }).catch(() => {});
     fabComponent?.highlightMode(mode);
     // Set active state immediately (belt-and-suspenders)
     fabComponent?.setState('active');
@@ -3050,12 +3299,24 @@
   /** Auto-start translation if the user previously enabled it. */
   async function maybeAutoStart() {
     try {
-      const cfg = await chrome.storage.local.get(['wt_autoMode', 'wt_active']);
+      // Use session storage — scoped to this specific tab, won't bleed to other tabs
+      const cfg = await chrome.storage.session.get(['wt_autoMode', 'wt_active']);
       if (cfg.wt_active && cfg.wt_autoMode) {
         console.log('[WT] Auto-starting translation in', cfg.wt_autoMode, 'mode');
+        currentMode = cfg.wt_autoMode;
         startTranslation(cfg.wt_autoMode);
+      } else {
+        // Fallback: check local storage for default mode (legacy)
+        const localCfg = await chrome.storage.local.get(['defaultMode']);
+        currentMode = localCfg.defaultMode || 'inline';
       }
-    } catch {}
+    } catch {
+      // session storage may not be available in some contexts
+      try {
+        const localCfg = await chrome.storage.local.get(['defaultMode']);
+        currentMode = localCfg.defaultMode || 'inline';
+      } catch {}
+    }
   }
 
 })();

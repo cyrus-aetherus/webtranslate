@@ -159,21 +159,25 @@ function updateFabState(to, from) {
       fabComponent.setState('active');
       fabComponent.setModeBadge(currentMode);
       fabComponent.updateMenu('TRANSLATING', currentMode);
+      fabComponent.updateLabels(t);
       break;
     case State.PAUSED:
       fabComponent.setState('paused');
       fabComponent.setModeBadge(null); // hide badge when paused
       fabComponent.updateMenu('PAUSED', currentMode);
+      fabComponent.updateLabels(t);
       break;
     case State.ERROR:
       fabComponent.setState('error');
       fabComponent.setModeBadge(null);
       fabComponent.updateMenu('ERROR', currentMode);
+      fabComponent.updateLabels(t);
       break;
     default:
       fabComponent.setState('idle');
       fabComponent.setModeBadge(currentMode);
       fabComponent.updateMenu('IDLE', currentMode);
+      fabComponent.updateLabels(t);
       break;
   }
 }
@@ -318,7 +322,7 @@ function stopTranslation() {
 
 /** Clear all inline translation blocks from DOM, keep cache, go IDLE. */
 function clearTranslations() {
-  inlineRenderer?.clearAll();
+  inlineRenderer?.clearAll(); // also clears wtDone markers
   stateManager?.transition(State.IDLE);
   fabComponent?.setState('idle');
 }
