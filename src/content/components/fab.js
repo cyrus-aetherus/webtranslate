@@ -80,13 +80,13 @@ const CSS = `
   border:1px solid #e7e0ec;font-weight:500;font-size:12px;color:#1d1b20;
   box-shadow:0 1px 3px rgba(0,0,0,.06);}
 
-/* Primary action (main button — larger, emphasized) */
+/* Primary action (main button — larger, neutral idle, purple on hover) */
 .wt-fab-menu-item.wt-primary .wt-mi-dot{width:42px;height:42px;
-  background:#eaddff;border-color:#6750a4;}
-.wt-fab-menu-item.wt-primary .wt-mi-label{font-weight:600;color:#6750a4;}
-.wt-fab-menu-item.wt-primary:hover .wt-mi-dot{background:#6750a4;border-color:#6750a4;}
-.wt-fab-menu-item.wt-primary:hover .wt-mi-dot svg{stroke:#fff;}
-.wt-fab-menu-item.wt-primary:hover .wt-mi-label{background:#6750a4;color:#fff;}
+  background:#fff;border:2px solid #cac4d0;}
+.wt-fab-menu-item.wt-primary .wt-mi-label{font-weight:600;color:#1d1b20;}
+.wt-fab-menu-item.wt-primary:hover .wt-mi-dot{background:#eaddff;border-color:#6750a4;}
+.wt-fab-menu-item.wt-primary:hover .wt-mi-dot svg{stroke:#6750a4;}
+.wt-fab-menu-item.wt-primary:hover .wt-mi-label{background:#eaddff;color:#6750a4;}
 .wt-fab-menu-item.wt-primary.wt-stop .wt-mi-dot{background:#f9dedc;border-color:#b3261e;}
 .wt-fab-menu-item.wt-primary.wt-stop .wt-mi-label{color:#b3261e;font-weight:600;}
 .wt-fab-menu-item.wt-primary.wt-stop:hover .wt-mi-dot{background:#b3261e;border-color:#b3261e;}
