@@ -84,6 +84,8 @@ const HARDCODED_EN_FALLBACK = {
   'toast.config_hint': 'Set your API URL, Key and Model — translation starts automatically once saved.',
   'toast.open_settings': 'Open Settings',
   'toast.dismiss': 'Dismiss',
+  'toast.panel_unavailable': 'Panel unavailable',
+  'toast.panel_fallback': 'Falling back to inline mode. Grant sidePanel permission in extension settings to enable panel translation.',
 };
 
 /** @type {{locale:string, messages:Record<string,string>, ready:boolean}} */

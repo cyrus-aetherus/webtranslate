@@ -31,10 +31,10 @@ describe('PanelRenderer', () => {
     expect(chrome.sidePanel.open).toHaveBeenCalledWith({ tabId: 42 });
   });
 
-  it('falls back when sidePanel is unavailable', async () => {
+  it('returns false when sidePanel API is unavailable', async () => {
     delete chrome.sidePanel;
     const ok = await renderer.open();
-    expect(ok).toBe(true); // still tries to connect via port
+    expect(ok).toBe(false); // panel mode unavailable — caller should fall back to inline
   });
 
   it('connects port on renderBatch', () => {

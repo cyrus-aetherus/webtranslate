@@ -33,7 +33,9 @@ async function bootstrap() {
 bootstrap();
 
 function connect() {
-  // In panel context, runtime.connect() connects back to the extension
+  // Connect back to SW.  Only one side panel is open at a time,
+  // so we use a fixed port name — the SW relays messages from
+  // content-script PanelRenderer ports to this receiver.
   port = chrome.runtime.connect({ name: 'wt-panel-receiver' });
 
   port.onMessage.addListener((msg) => {

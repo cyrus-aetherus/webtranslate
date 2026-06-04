@@ -163,3 +163,31 @@ chrome.runtime.onSuspend?.addListener(() => {
   downloadManager.dispose();
   statsTracker.dispose();
 });
+
+/**
+ * Panel Port Bridge — routes messages between Content Script and Side Panel.
+ *
+ * MV3: Content Script ↔ SW ↔ Panel is the only valid Port topology.
+ * Only one side panel is open at a time, so a single receiver port covers
+ * all tabs.  CS ports use `wt-panel-cs`; the panel uses `wt-panel-receiver`.
+ */
+(() => {
+  let panelReceiver = null;
+
+  chrome.runtime.onConnect.addListener((port) => {
+    if (port.name === 'wt-panel-receiver') {
+      panelReceiver = port;
+      port.onDisconnect.addListener(() => { panelReceiver = null; });
+      return;
+    }
+
+    if (port.name === 'wt-panel-cs') {
+      port.onMessage.addListener((msg) => {
+        if (panelReceiver) {
+          try { panelReceiver.postMessage(msg); } catch { panelReceiver = null; }
+        }
+      });
+      return;
+    }
+  });
+})();

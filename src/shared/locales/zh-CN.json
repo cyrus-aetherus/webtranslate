@@ -85,5 +85,7 @@
   "toast.api_not_configured": "API 未配置",
   "toast.config_hint": "请设置 API URL、Key 和模型 — 保存后将自动开始翻译。",
   "toast.open_settings": "打开设置",
-  "toast.dismiss": "关闭"
+  "toast.dismiss": "关闭",
+  "toast.panel_unavailable": "面板模式不可用",
+  "toast.panel_fallback": "已切换回内联模式。请在扩展设置中授予 sidePanel 权限以启���面板翻译。"
 }

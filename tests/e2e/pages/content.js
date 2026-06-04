@@ -1420,6 +1420,10 @@
 #wt-fab.wt-error .wt-fab-ring{stroke:#b3261e;fill:none;}
 #wt-fab.wt-error .wt-fab-bracket{stroke:#b3261e;fill:none;}
 
+/* Pulse animation — draws attention when paused */
+#wt-fab.wt-pulse{animation:wt-pulse .6s ease;}
+@keyframes wt-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.18)}}
+
 /* ---- Mode badge ---- */
 #wt-fab .wt-mode-badge{position:absolute;top:-2px;right:-2px;
   width:18px;height:18px;border-radius:50%;
@@ -1446,13 +1450,13 @@
   border:1px solid #e7e0ec;font-weight:500;font-size:12px;color:#1d1b20;
   box-shadow:0 1px 3px rgba(0,0,0,.06);}
 
-/* Primary action (main button — larger, emphasized) */
+/* Primary action (main button — larger, neutral idle, purple on hover) */
 .wt-fab-menu-item.wt-primary .wt-mi-dot{width:42px;height:42px;
-  background:#eaddff;border-color:#6750a4;}
-.wt-fab-menu-item.wt-primary .wt-mi-label{font-weight:600;color:#6750a4;}
-.wt-fab-menu-item.wt-primary:hover .wt-mi-dot{background:#6750a4;border-color:#6750a4;}
-.wt-fab-menu-item.wt-primary:hover .wt-mi-dot svg{stroke:#fff;}
-.wt-fab-menu-item.wt-primary:hover .wt-mi-label{background:#6750a4;color:#fff;}
+  background:#fff;border:2px solid #cac4d0;}
+.wt-fab-menu-item.wt-primary .wt-mi-label{font-weight:600;color:#1d1b20;}
+.wt-fab-menu-item.wt-primary:hover .wt-mi-dot{background:#eaddff;border-color:#6750a4;}
+.wt-fab-menu-item.wt-primary:hover .wt-mi-dot svg{stroke:#6750a4;}
+.wt-fab-menu-item.wt-primary:hover .wt-mi-label{background:#eaddff;color:#6750a4;}
 .wt-fab-menu-item.wt-primary.wt-stop .wt-mi-dot{background:#f9dedc;border-color:#b3261e;}
 .wt-fab-menu-item.wt-primary.wt-stop .wt-mi-label{color:#b3261e;font-weight:600;}
 .wt-fab-menu-item.wt-primary.wt-stop:hover .wt-mi-dot{background:#b3261e;border-color:#b3261e;}
@@ -1616,6 +1620,24 @@
     setState(s) {
       this.el?.classList.remove('wt-idle', 'wt-active', 'wt-paused', 'wt-error');
       this.el?.classList.add('wt-' + s);
+    }
+
+    /** Brief scale pulse to draw user attention, then clean up. */
+    pulse() {
+      if (!this.el) return;
+      this.el.classList.add('wt-pulse');
+      this.el.addEventListener('animationend', () => {
+        this.el.classList.remove('wt-pulse');
+      }, { once: true });
+    }
+
+    /** Open the menu, then auto-close after `duration` ms. */
+    autoExpand(duration) {
+      if (!this._open) this._openMenu();
+      clearTimeout(this._autoExpandTimer);
+      this._autoExpandTimer = setTimeout(() => {
+        if (this._open) this._close();
+      }, duration);
     }
 
     /**
@@ -2830,9 +2852,12 @@
         break;
       case State.PAUSED:
         fabComponent.setState('paused');
-        fabComponent.setModeBadge(null); // hide badge when paused
+        fabComponent.setModeBadge(null);
         fabComponent.updateMenu('PAUSED', currentMode);
         fabComponent.updateLabels(t);
+        // Auto-expand menu so user discovers Clear/Retranslate
+        fabComponent.pulse();
+        setTimeout(() => fabComponent.autoExpand(3000), 400);
         break;
       case State.ERROR:
         fabComponent.setState('error');
