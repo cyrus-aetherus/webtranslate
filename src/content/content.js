@@ -138,11 +138,18 @@ async function init() {
       updateDownloadProgress(msg);
     }
     if (msg.type === 'SCROLL_TO') {
-      // Try original paragraph element (stores wtPgId via markTranslated)
       let el = document.querySelector(`[data-wt-pg-id="${msg.paragraphId}"]`);
-      // Fallback: inline translation block (stores wtId via InlineRenderer)
       if (!el) el = document.querySelector(`.wt-inline-block[data-wt-id="${msg.paragraphId}"]`);
-      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Flash highlight: brief yellow background to draw attention
+        el.style.transition = 'background 0s';
+        el.style.background = '#fef08a'; // tailwind yellow-200
+        requestAnimationFrame(() => {
+          el.style.transition = 'background 1.2s ease-out';
+          el.style.background = 'transparent';
+        });
+      }
     }
   });
 
