@@ -22,6 +22,19 @@ let erroredSlots = 0;
 badgeEl.className = 'waiting';
 
 async function bootstrap() {
+  await _loadLocale();
+  applyI18nElements(document);
+  connect();
+  // Listen for language changes so the panel stays in sync with popup settings
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes.wt_language) {
+      _loadLocale().then(() => _refreshAllText());
+    }
+  });
+}
+bootstrap();
+
+async function _loadLocale() {
   try {
     const stored = await chrome.storage.local.get('wt_language');
     const nav = navigator.language;
@@ -32,10 +45,25 @@ async function bootstrap() {
   } catch {
     await initI18n('en');
   }
-  applyI18nElements(document);
-  connect();
 }
-bootstrap();
+
+/** Re-render all dynamic text after a language change. */
+function _refreshAllText() {
+  applyI18nElements(document);
+  // Update badge
+  _updateBadge();
+  // Refresh slot placeholders
+  for (const slot of slotMap.values()) {
+    if (slot.classList.contains('pending')) {
+      const span = slot.querySelector('.wt-slot-pending');
+      if (span) span.textContent = t('panel.waiting');
+    }
+    const copyBtn = slot.querySelector('[data-action="copy"]');
+    if (copyBtn) copyBtn.textContent = t('panel.copy');
+    const scrollBtn = slot.querySelector('[data-action="scroll"]');
+    if (scrollBtn) scrollBtn.textContent = t('panel.scroll_to');
+  }
+}
 
 function connect() {
   port = chrome.runtime.connect({ name: 'wt-panel-receiver' });
