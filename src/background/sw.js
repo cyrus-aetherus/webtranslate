@@ -57,6 +57,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ ok: true });
       return false;
 
+    case 'OPEN_SIDE_PANEL':
+      openSidePanel(tabId ?? sender.tab?.id)
+        .then(() => sendResponse({ ok: true }))
+        .catch((err) => sendResponse({ ok: false, error: err.message }));
+      return true; // async response
+
     case 'GET_STATS':
       sendResponse({
         session: statsTracker.getStats('session', tabId),
@@ -147,11 +153,14 @@ async function handleDownload(message, tabId) {
 }
 
 /**
- * Open side panel for a given tab (MV3)
+ * Open side panel for a given tab (MV3).
+ * Called from SW context where chrome.sidePanel is available.
  */
 async function openSidePanel(tabId) {
-  if (chrome.sidePanel) {
+  if (chrome.sidePanel && tabId) {
     await chrome.sidePanel.open({ tabId });
+  } else {
+    throw new Error('chrome.sidePanel not available or no tabId');
   }
 }
 

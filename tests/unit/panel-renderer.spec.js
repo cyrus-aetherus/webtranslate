@@ -9,32 +9,35 @@ describe('PanelRenderer', () => {
   let renderer;
 
   beforeEach(() => {
-    // Mock chrome.runtime.connect
     global.chrome = {
       runtime: {
+        sendMessage: vi.fn().mockResolvedValue({ ok: true }),
         connect: vi.fn(() => ({
           postMessage: vi.fn(),
           disconnect: vi.fn(),
           onDisconnect: { addListener: vi.fn() },
         })),
       },
-      sidePanel: {
-        open: vi.fn().mockResolvedValue(),
-      },
     };
     renderer = new PanelRenderer(42);
   });
 
-  it('opens side panel if available', async () => {
+  it('delegates open to SW via sendMessage', async () => {
     const ok = await renderer.open();
     expect(ok).toBe(true);
-    expect(chrome.sidePanel.open).toHaveBeenCalledWith({ tabId: 42 });
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ type: 'OPEN_SIDE_PANEL', tabId: 42 });
   });
 
-  it('returns false when sidePanel API is unavailable', async () => {
-    delete chrome.sidePanel;
+  it('returns false when SW open fails', async () => {
+    chrome.runtime.sendMessage.mockResolvedValue({ ok: false, error: 'test' });
     const ok = await renderer.open();
-    expect(ok).toBe(false); // panel mode unavailable — caller should fall back to inline
+    expect(ok).toBe(false);
+  });
+
+  it('returns false when sendMessage throws', async () => {
+    chrome.runtime.sendMessage.mockRejectedValue(new Error('disconnected'));
+    const ok = await renderer.open();
+    expect(ok).toBe(false);
   });
 
   it('connects port on renderBatch', () => {
@@ -65,7 +68,7 @@ describe('PanelRenderer', () => {
       onDisconnect: { addListener: vi.fn() },
     });
 
-    renderer.renderBatch([]); // triggers connect
+    renderer.renderBatch([]);
     renderer.dispose();
     expect(disconnect).toHaveBeenCalled();
   });

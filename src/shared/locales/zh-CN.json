@@ -87,5 +87,5 @@
   "toast.open_settings": "打开设置",
   "toast.dismiss": "关闭",
   "toast.panel_unavailable": "面板模式暂不可用",
-  "toast.panel_fallback": "已自动切换为内联模式。如需使用面板模式，请更新 Chrome 至最新版本后重试。"
+  "toast.panel_fallback": "已自动切换为内联模式。"
 }

@@ -85,7 +85,7 @@ const HARDCODED_EN_FALLBACK = {
   'toast.open_settings': 'Open Settings',
   'toast.dismiss': 'Dismiss',
   'toast.panel_unavailable': 'Panel mode unavailable',
-  'toast.panel_fallback': 'Switched to inline mode. Update Chrome to the latest version for panel support.',
+  'toast.panel_fallback': 'Switched to inline mode.',
 };
 
 /** @type {{locale:string, messages:Record<string,string>, ready:boolean}} */

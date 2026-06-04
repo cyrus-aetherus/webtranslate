@@ -1,6 +1,9 @@
 /**
  * PanelRenderer - Pushes translation results to the Chrome Side Panel
  * via chrome.runtime.connect long-lived Port.
+ *
+ * chrome.sidePanel.open() is only available in the Service Worker context,
+ * NOT in content scripts.  We delegate the open call via SW message.
  */
 
 const PORT_CS_NAME = 'wt-panel-cs';
@@ -13,24 +16,18 @@ export class PanelRenderer {
   }
 
   /**
-   * Open the side panel and establish a Port connection.
+   * Open the side panel (via SW) and establish a Port connection.
    * @returns {Promise<boolean>} true if panel opened successfully
    */
   async open() {
-    // Try native sidePanel API (MV3), requires optional sidePanel permission
-    if (chrome.sidePanel) {
-      try {
-        await chrome.sidePanel.open({ tabId: this.tabId });
-      } catch (err) {
-        console.warn('[WT] sidePanel.open failed:', err.message);
-        this._connected = false;
+    try {
+      const res = await chrome.runtime.sendMessage({ type: 'OPEN_SIDE_PANEL', tabId: this.tabId });
+      if (!res || !res.ok) {
+        console.warn('[WT] SW failed to open side panel:', res?.error || 'unknown');
         return false;
       }
-    } else {
-      // chrome.sidePanel API not available — user hasn't granted permission
-      // or browser doesn't support it.  Fall back.
-      console.warn('[WT] chrome.sidePanel is not available — panel mode unavailable');
-      this._connected = false;
+    } catch (err) {
+      console.warn('[WT] OPEN_SIDE_PANEL message failed:', err.message);
       return false;
     }
 
