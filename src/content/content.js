@@ -244,6 +244,15 @@ const _pendingBatches = new Map();
 // Set of fingerprints currently awaiting API results — prevents
 // duplicate submissions on rapid scroll.
 const _pendingFingerprints = new Set();
+// Per-page storage keys keyed by URL hash — survives refresh, isolated per page.
+const _pageId = (() => {
+  const u = location.origin + location.pathname;
+  let h = 0;
+  for (let i = 0; i < u.length; i++) { h = ((h << 5) - h) + u.charCodeAt(i); h |= 0; }
+  return (h >>> 0).toString(16).slice(0, 8);
+})();
+const _stKey = (name) => `wt_${name}_${_pageId}`;
+
 // Callback for sequential top-down batch processing (set by startTranslation)
 let _onBatchDone = null;
 
@@ -354,7 +363,7 @@ function stopTranslation() {
   _pendingBatches.clear();
   _onBatchDone = null;
   chrome.runtime.sendMessage({ type: MSG.STOP_ALL, tabId: TAB_ID || 0 });
-  chrome.storage.session.set({ wt_active: false }).catch(() => {});
+  chrome.storage.local.set({ [_stKey('active')]: false }).catch(() => {});
   // Transition to PAUSED instead of IDLE — keeps translated DOM visible,
   // allows user to Clear, Retranslate, or Resume.
   stateManager?.transition(State.PAUSED);
@@ -414,7 +423,7 @@ async function startTranslation(mode = currentMode) {
 
   // Persist active state so translation auto-starts on next visit
   // Use session storage — scoped to this tab/window, won't auto-start in new tabs.
-  chrome.storage.session.set({ wt_active: true, wt_autoMode: mode }).catch(() => {});
+  chrome.storage.local.set({ [_stKey('active')]: true, [_stKey('mode')]: mode }).catch(() => {});
   fabComponent?.highlightMode(mode);
   // Set active state immediately (belt-and-suspenders)
   fabComponent?.setState('active');
@@ -826,11 +835,11 @@ function showConfigToast() {
 async function maybeAutoStart() {
   try {
     // Use session storage — scoped to this specific tab, won't bleed to other tabs
-    const cfg = await chrome.storage.session.get(['wt_autoMode', 'wt_active']);
-    if (cfg.wt_active && cfg.wt_autoMode) {
-      console.log('[WT] Auto-starting translation in', cfg.wt_autoMode, 'mode');
-      currentMode = cfg.wt_autoMode;
-      startTranslation(cfg.wt_autoMode);
+    const cfg = await chrome.storage.local.get([_stKey('active'), _stKey('mode')]);
+    if (cfg[_stKey('active')] && cfg[_stKey('mode')]) {
+      console.log('[WT] Auto-starting translation in', cfg[_stKey('mode')], 'mode');
+      currentMode = cfg[_stKey('mode')];
+      startTranslation(cfg[_stKey('mode')]);
     } else {
       // Fallback: check local storage for default mode (legacy)
       const localCfg = await chrome.storage.local.get(['defaultMode']);
