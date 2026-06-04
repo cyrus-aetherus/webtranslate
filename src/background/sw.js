@@ -158,19 +158,15 @@ async function handleDownload(message, tabId) {
  */
 async function openSidePanel(tabId) {
   if (chrome.sidePanel && tabId) {
-    // Disable the previous tab's panel so Chrome doesn't auto-reopen it
-    // when the user switches back — behaviour must be deterministic.
-    if (_panelTabId > 0 && _panelTabId !== tabId) {
-      chrome.sidePanel.setOptions({ tabId: _panelTabId, enabled: false }).catch(() => {});
-    }
     _panelTabId = tabId;
-    // Per-tab enable: Chrome closes the panel natively when leaving this tab.
-    // Omit `path` — Chrome falls back to manifest's side_panel.default_path,
-    // which is correct in both dev (src/panel/panel.html) and dist (panel.html).
-    await chrome.sidePanel.setOptions({
-      tabId,
-      enabled: true,
-    });
+    // Attempt per-tab enable so Chrome auto-closes when leaving the tab.
+    // If setOptions fails (e.g. unsupported in this Chrome build), fall
+    // through to plain open() — panel still opens, just stays open on switch.
+    try {
+      await chrome.sidePanel.setOptions({ tabId, enabled: true });
+    } catch (e) {
+      console.warn('[WT] sidePanel.setOptions failed:', e.message);
+    }
     await chrome.sidePanel.open({ tabId });
   } else {
     throw new Error('chrome.sidePanel not available or no tabId');
