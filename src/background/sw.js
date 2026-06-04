@@ -158,12 +158,32 @@ async function handleDownload(message, tabId) {
  */
 async function openSidePanel(tabId) {
   if (chrome.sidePanel && tabId) {
+    // Disable the previous tab's panel so Chrome doesn't auto-reopen it
+    // when the user switches back — behaviour must be deterministic.
+    if (_panelTabId > 0 && _panelTabId !== tabId) {
+      chrome.sidePanel.setOptions({ tabId: _panelTabId, enabled: false }).catch(() => {});
+    }
     _panelTabId = tabId;
+    // Per-tab enable: Chrome closes the panel natively when leaving this tab.
+    await chrome.sidePanel.setOptions({
+      tabId,
+      enabled: true,
+      path: 'src/panel/panel.html',
+    });
     await chrome.sidePanel.open({ tabId });
   } else {
     throw new Error('chrome.sidePanel not available or no tabId');
   }
 }
+
+/**
+ * Disable global side panel on install — we use per-tab setOptions instead.
+ * Global default_path in manifest would keep panel open across tab switches;
+ * disabling it lets Chrome close panel natively when leaving a tab.
+ */
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.sidePanel?.setOptions({ enabled: false });
+});
 
 /**
  * Cleanup on suspend
