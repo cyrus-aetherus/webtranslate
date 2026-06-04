@@ -165,10 +165,11 @@ async function openSidePanel(tabId) {
     }
     _panelTabId = tabId;
     // Per-tab enable: Chrome closes the panel natively when leaving this tab.
+    // Omit `path` — Chrome falls back to manifest's side_panel.default_path,
+    // which is correct in both dev (src/panel/panel.html) and dist (panel.html).
     await chrome.sidePanel.setOptions({
       tabId,
       enabled: true,
-      path: 'src/panel/panel.html',
     });
     await chrome.sidePanel.open({ tabId });
   } else {
