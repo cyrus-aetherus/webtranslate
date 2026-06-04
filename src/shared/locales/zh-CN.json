@@ -87,5 +87,5 @@
   "toast.open_settings": "打开设置",
   "toast.dismiss": "关闭",
   "toast.panel_unavailable": "面板模式不可用",
-  "toast.panel_fallback": "已切换回内联模式。请在扩展设置中授予 sidePanel 权限以启用面板翻译。"
+  "toast.panel_fallback": "已切换回内联模式。请在扩展设置中授予「侧边栏」权限以启用面板翻译。"
 }
