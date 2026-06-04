@@ -221,3 +221,44 @@ src/content/
 - [ ] **自定义主按钮**：允许用户在设置中指定"点击 FAB 直接做什么"
 - [ ] **翻译块右键菜单**：点击 Inline 翻译块右上角可单独"隐藏此翻译"或"重新翻译此段"
 - [ ] **翻译历史面板**：记录最近 10 次翻译操作的统计信息
+
+---
+
+## 11. Panel 模式槽位模型
+
+### 设计原则
+
+Panel 模式下翻译结果按段落提取顺序排列展示。由于 API 批次并发返回顺序不可控，需要一个"先占位后填充"的槽位模型保证视觉顺序。
+
+### 标识方案
+
+段落唯一标识使用 `generateParagraphId` 生成的 DOM 路径 ID（`wt_main0_article0_p0`）。单次 `extractParagraphs()` 内 ID 唯一且稳定。
+
+| 标识 | 用途 | 跨提取稳定 |
+|---|---|---|
+| `id`（DOM 路径） | 槽位定位主键，`slotMap.get(id)` O(1) | 单次 session 内稳定 |
+| `sortOrder` | INIT_SLOTS 时槽位 DOM 插入顺序 | 否（仅用于初始排序） |
+
+### 消息流
+
+```
+INIT_SLOTS    → panel.js 创建 slotMap + 渲染占位槽位
+BATCH_RESULT  → fillSlots 按 id 填入译文
+APPEND_SLOTS  → 渐进加载页面追加槽位
+SLOT_ERROR    → 标记失败槽位
+```
+
+### 闭环覆盖
+
+| 场景 | 处理方式 |
+|---|---|
+| **正常翻译** | INIT_SLOTS → 顺序处理器 → BATCH_RESULT 逐个填槽 |
+| **缓存命中** | `_processNextBatch` 直接发 `panelRenderer.renderBatch({id, translation})` 填槽 |
+| **渐进加载/无限滚动** | `_flushVisible` 检测新段落 → `appendSlots` 追加槽位 → 发送翻译 |
+| **API 错误** | `handleBatchResult` error → `panelRenderer.markSlotErrors(ids)` → 面板显示 ⚠️ |
+| **Panel 关闭后重开** | `onPanel` 检测 TRANSLATING+panel → `reinitPanelSlots()` 重建槽位 + 填入缓存结果 |
+| **SPA 路由切换** | `setupResilience` 拦截 `pushState/replaceState/popstate` → 停止翻译 + 清状态 |
+
+### Port 桥接
+
+Content Script (`wt-panel-cs`) 与 Panel (`wt-panel-receiver`) 通过 SW 转发。SW 在 Panel 端口未就绪时缓冲消息，Panel 连接后刷新。同一时间只有一个 Panel 打开，无需 tabId 路由。

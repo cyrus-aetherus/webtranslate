@@ -50,6 +50,15 @@ async function init() {
     },
     onPanel: () => {
       const st = stateManager?.get();
+      // Panel mode re-open: if already translating in panel mode, re-init slots
+      // so the panel (which may have been closed-and-reopened) gets fresh slot data.
+      if ((st === State.TRANSLATING || st === State.SCANNING) && currentMode === 'panel') {
+        panelRenderer?.open().then(opened => {
+          if (!opened) return;
+          reinitPanelSlots();
+        }).catch(() => {});
+        return;
+      }
       if (st === State.TRANSLATING || st === State.SCANNING) return;
       startTranslation('panel');
     },
@@ -280,6 +289,11 @@ function handleBatchResult(msg) {
   if (error || !results) {
     console.error('[WT] Batch result error:', error);
     circuitBreaker?.recordFailure();
+    // In Panel mode, mark the corresponding slots as errored so the user
+    // sees which paragraphs failed instead of waiting forever.
+    if (currentMode === 'panel' && items) {
+      panelRenderer.markSlotErrors(items.map(it => it.id));
+    }
     return;
   }
 
@@ -515,28 +529,46 @@ async function startTranslation(mode = currentMode) {
     onBatchReady(batch);
   };
 
-  // Scroll-driven scanner: re-render cached, submit new batches
+  // Scroll-driven scanner: re-render cached, submit new batches.
+  // In Panel mode this handles progressive-loading pages: new paragraphs
+  // get appended as slots, cached ones fill existing slots.
   const _flushVisible = () => {
     if (stateManager.get() !== State.TRANSLATING) return;
     const fresh = extractParagraphs();
     const needs = [];
+    const newSlots = [];
+
     for (const el of fresh) {
+      const id = generateParagraphId(el);
       const fp = computeFingerprint(el);
       const rect = el.getBoundingClientRect();
       if (rect.top >= window.innerHeight + 400 || rect.bottom <= -400) continue;
       if (_pendingFingerprints.has(fp)) continue;
+
       const cached = cacheManager?.get(fp);
       if (cached) {
-        // Skip if already rendered (adjacent block exists)
-        const next = el.nextElementSibling;
-        if (next?.classList?.contains('wt-inline-block')) continue;
-        markTranslated(el, fp);
         if (currentMode === 'inline') {
-          inlineRenderer.render(el, cached, generateParagraphId(el));
+          const next = el.nextElementSibling;
+          if (next?.classList?.contains('wt-inline-block')) continue;
+          markTranslated(el, fp);
+          inlineRenderer.render(el, cached, id);
+        } else {
+          // Panel mode: fill cached translation into the matching slot
+          panelRenderer.renderBatch([{ id, original: getTranslatableText(el), translation: cached }]);
         }
       } else if (!el.dataset.wtDone) {
-        needs.push({ id: generateParagraphId(el), fingerprint: fp, text: getTranslatableText(el), element: el });
+        const item = { id, fingerprint: fp, text: getTranslatableText(el), element: el };
+        needs.push(item);
+        // Collect truly new paragraphs for slot appending
+        if (currentMode === 'panel') {
+          newSlots.push({ id, original: item.text, sortOrder: items.length + newSlots.length });
+        }
       }
+    }
+
+    // Panel mode: append slots for newly discovered paragraphs
+    if (currentMode === 'panel' && newSlots.length) {
+      panelRenderer.appendSlots(newSlots);
     }
     if (needs.length) onBatchReady(needs);
   };
@@ -566,7 +598,46 @@ async function startTranslation(mode = currentMode) {
 }
 
 // ------------------------------------------------------------------
-// Resilience: offline detection & graceful shutdown
+// Panel reopen: rebuild slots without restarting translation
+// ------------------------------------------------------------------
+
+/** Re-extract paragraphs and init panel slots + fill cached results.
+ *  Used when the panel is closed and reopened while translation is running. */
+function reinitPanelSlots() {
+  const paragraphs = extractParagraphs();
+  if (!paragraphs.length) return;
+
+  const items = paragraphs.map((el) => {
+    const id = generateParagraphId(el);
+    const fp = computeFingerprint(el);
+    const text = getTranslatableText(el);
+    return { id, fingerprint: fp, text, element: el };
+  }).sort((a, b) => {
+    const pos = a.element.compareDocumentPosition(b.element);
+    return (pos & Node.DOCUMENT_POSITION_PRECEDING) ? 1 : -1;
+  });
+  items.forEach((it, i) => { it.sortOrder = i; });
+
+  // Re-init slots on the panel
+  panelRenderer.initSlots(items.map(it => ({
+    id: it.id, original: it.text, sortOrder: it.sortOrder,
+  })));
+
+  // Fill cached results immediately
+  const cachedBatch = [];
+  for (const it of items) {
+    const cached = cacheManager?.get(it.fingerprint);
+    if (cached) {
+      cachedBatch.push({ id: it.id, original: it.text, translation: cached });
+    }
+  }
+  if (cachedBatch.length) {
+    panelRenderer.renderBatch(cachedBatch);
+  }
+}
+
+// ------------------------------------------------------------------
+// Resilience: offline detection, SPA routing, graceful shutdown
 // ------------------------------------------------------------------
 
 function setupResilience() {
@@ -584,6 +655,33 @@ function setupResilience() {
       stateManager.transition(State.PAUSED);
     }
   });
+
+  // SPA route change detection.
+  // When the URL changes without a full page reload (pushState / replaceState /
+  // popstate), any active translation refers to the previous page's content.
+  // We stop translation to avoid feeding stale DOM into the panel.
+  if (window.history) {
+    const _onRouteChange = () => {
+      if (stateManager.get() !== State.IDLE) {
+        console.log('[WT] SPA route change detected — stopping translation');
+        clearTranslations();
+        stopTranslation();
+        chrome.runtime.sendMessage({ type: MSG.STOP_ALL, tabId: TAB_ID }).catch(() => {});
+      }
+    };
+
+    // Override pushState / replaceState
+    const _origPush = window.history.pushState;
+    const _origReplace = window.history.replaceState;
+    const _wrap = (orig) => function (...args) {
+      const result = orig.apply(this, args);
+      try { _onRouteChange(); } catch {}
+      return result;
+    };
+    try { window.history.pushState = _wrap(_origPush); } catch {}
+    try { window.history.replaceState = _wrap(_origReplace); } catch {}
+    window.addEventListener('popstate', _onRouteChange);
+  }
 
   // Graceful stop on page unload
   window.addEventListener('beforeunload', () => {

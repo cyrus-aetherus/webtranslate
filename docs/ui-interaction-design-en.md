@@ -220,3 +220,44 @@ Previously Stop → IDLE left blocks on the page with no way to clear them (exce
 - [ ] **Custom primary action**: Let users configure what clicking the FAB does
 - [ ] **Per-block context menu**: Right-click individual blocks to hide or re-translate
 - [ ] **Translation history panel**: Log last 10 translation sessions with stats
+
+---
+
+## 11. Panel Mode Slot Model
+
+### Design Rationale
+
+Panel mode displays translations in paragraph extraction order. Since concurrent API batches may return out of order, we use a "placeholder-first, fill-later" slot model to guarantee correct visual order.
+
+### Identification
+
+Each paragraph is identified by its `generateParagraphId`-generated DOM-path ID (`wt_main0_article0_p0`). This is unique within a single `extractParagraphs()` call.
+
+| Identifier | Purpose | Cross-extraction stable |
+|---|---|---|
+| `id` (DOM path) | Primary slot key, `slotMap.get(id)` O(1) | Stable within a single session |
+| `sortOrder` | INIT_SLOTS DOM insertion order | No (ordering only) |
+
+### Message Flow
+
+```
+INIT_SLOTS    → panel.js builds slotMap + renders placeholder slots
+BATCH_RESULT  → fillSlots fills slots by id
+APPEND_SLOTS  → append slots for progressive-loading pages
+SLOT_ERROR    → mark failed slots
+```
+
+### Closed-Loop Coverage
+
+| Scenario | Handling |
+|---|---|
+| **Normal translation** | INIT_SLOTS → sequential processor → BATCH_RESULT fill per id |
+| **Cache hits** | `_processNextBatch` directly sends `panelRenderer.renderBatch({id, translation})` |
+| **Progressive loading / infinite scroll** | `_flushVisible` detects new paragraphs → `appendSlots` → send to translate |
+| **API errors** | `handleBatchResult` error → `panelRenderer.markSlotErrors(ids)` → panel shows ⚠️ |
+| **Panel close → reopen** | `onPanel` detects TRANSLATING+panel → `reinitPanelSlots()` rebuilds slots + fills cache |
+| **SPA route change** | `setupResilience` intercepts `pushState/replaceState/popstate` → stops translation |
+
+### Port Bridge
+
+Content Script (`wt-panel-cs`) ↔ SW ↔ Panel (`wt-panel-receiver`). SW buffers messages when the panel port is not yet connected and flushes them on connect. Only one panel is open at a time, so tabId routing is unnecessary.

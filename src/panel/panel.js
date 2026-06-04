@@ -1,10 +1,10 @@
 /**
- * Side Panel script.
- * Slot model: content.js sends INIT_SLOTS with all paragraphs (empty
- * translations).  We create placeholder divs ordered by sortOrder.
- * Subsequent BATCH_RESULT messages fill individual slots in-place.
- * This guarantees correct paragraph order and gives the user instant
- * feedback that translation has started.
+ * Side Panel script — slot-model rendering.
+ *
+ * Content.js sends INIT_SLOTS with all extracted paragraphs (id, original, sortOrder).
+ * We build a slotMap<id→element> and render placeholder divs ordered by sortOrder.
+ * Subsequent BATCH_RESULT / APPEND_SLOTS / SLOT_ERROR messages update individual
+ * slots in-place via slotMap.get(id) — O(1), no re-render, no re-order.
  */
 
 import { init as initI18n, t, tf, applyI18nElements } from '../shared/i18n.js';
@@ -12,8 +12,12 @@ import { init as initI18n, t, tf, applyI18nElements } from '../shared/i18n.js';
 let port = null;
 const listEl = document.getElementById('list');
 const badgeEl = document.getElementById('badge');
+
+/** @type {Map<string, HTMLElement>} id → slot DOM element */
+let slotMap = new Map();
 let totalSlots = 0;
 let filledSlots = 0;
+let erroredSlots = 0;
 
 badgeEl.className = 'waiting';
 
@@ -37,8 +41,10 @@ function connect() {
   port = chrome.runtime.connect({ name: 'wt-panel-receiver' });
 
   port.onMessage.addListener((msg) => {
-    if (msg.type === 'INIT_SLOTS') initSlots(msg.items);
-    if (msg.type === 'BATCH_RESULT') fillSlots(msg.items);
+    if (msg.type === 'INIT_SLOTS')    initSlots(msg.items);
+    if (msg.type === 'APPEND_SLOTS')  appendSlots(msg.items);
+    if (msg.type === 'BATCH_RESULT')  fillSlots(msg.items);
+    if (msg.type === 'SLOT_ERROR')    markSlotErrors(msg.itemIds);
   });
 
   port.onDisconnect.addListener(() => {
@@ -51,31 +57,46 @@ function connect() {
   badgeEl.className = 'connected';
 }
 
+// ---- INIT_SLOTS ----
+
 function initSlots(items) {
   listEl.querySelectorAll('.item, .empty').forEach(el => el.remove());
+  slotMap.clear();
   totalSlots = items.length;
   filledSlots = 0;
+  erroredSlots = 0;
 
-  // Items arrive pre-sorted by sortOrder (0, 1, 2, ...)
+  // Items arrive pre-sorted by sortOrder
   for (const it of items) {
-    const div = document.createElement('div');
-    div.className = 'item pending';
-    div.dataset.id = it.id;
-    div.dataset.sortOrder = it.sortOrder;
-    div.innerHTML = `
-      <div class="orig">${escapeHtml(it.original)}</div>
-      <div class="trans"><span class="wt-slot-pending">${t('panel.waiting')}</span></div>
-    `;
+    const div = _createSlot(it);
+    slotMap.set(it.id, div);
     listEl.appendChild(div);
   }
 
-  badgeEl.textContent = tf('panel.translated_count', { count: 0 });
-  _updateProgress();
+  _updateBadge();
 }
+
+// ---- APPEND_SLOTS (incremental — progressive-loading pages) ----
+
+function appendSlots(items) {
+  totalSlots += items.length;
+
+  for (const it of items) {
+    if (slotMap.has(it.id)) continue;
+    const div = _createSlot(it);
+    slotMap.set(it.id, div);
+    // Insert at the correct sortOrder position
+    _insertSorted(div, it.sortOrder);
+  }
+
+  _updateBadge();
+}
+
+// ---- BATCH_RESULT ----
 
 function fillSlots(items) {
   for (const it of items) {
-    const slot = document.querySelector(`.item[data-sort-order="${it.sortOrder}"]`);
+    const slot = slotMap.get(it.id);
     if (!slot || !slot.classList.contains('pending')) continue;
 
     slot.classList.remove('pending');
@@ -100,16 +121,63 @@ function fillSlots(items) {
     filledSlots++;
   }
 
-  badgeEl.textContent = tf('panel.translated_count', { count: filledSlots });
-  _updateProgress();
+  _updateBadge();
 }
 
-function _updateProgress() {
-  if (totalSlots === 0) return;
-  const pct = Math.round((filledSlots / totalSlots) * 100);
-  badgeEl.textContent = tf('panel.translated_count', { count: filledSlots });
-  // Visual: set a CSS variable so the panel can show a progress bar
-  listEl.style.setProperty('--wt-pct', pct + '%');
+// ---- SLOT_ERROR ----
+
+function markSlotErrors(itemIds) {
+  for (const id of itemIds) {
+    const slot = slotMap.get(id);
+    if (!slot || !slot.classList.contains('pending')) continue;
+
+    slot.classList.remove('pending');
+    slot.classList.add('error');
+    const transEl = slot.querySelector('.trans');
+    if (transEl) {
+      transEl.textContent = '⚠️ ' + t('panel.waiting');
+    }
+
+    erroredSlots++;
+    filledSlots++;
+  }
+
+  _updateBadge();
+}
+
+// ---- helpers ----
+
+function _createSlot(it) {
+  const div = document.createElement('div');
+  div.className = 'item pending';
+  div.dataset.id = it.id;
+  div.dataset.sortOrder = it.sortOrder;
+  div.innerHTML = `
+    <div class="orig">${escapeHtml(it.original || '')}</div>
+    <div class="trans"><span class="wt-slot-pending">${t('panel.waiting')}</span></div>`;
+  return div;
+}
+
+/** Insert `div` in the correct position based on sortOrder (assumes items are pre-sorted). */
+function _insertSorted(div, sortOrder) {
+  let after = null;
+  for (const child of listEl.children) {
+    if (!child.dataset.sortOrder) continue;
+    if (parseInt(child.dataset.sortOrder, 10) > sortOrder) break;
+    after = child;
+  }
+  if (after && after.nextSibling) {
+    listEl.insertBefore(div, after.nextSibling);
+  } else {
+    listEl.appendChild(div);
+  }
+}
+
+function _updateBadge() {
+  const done = filledSlots;
+  const total = totalSlots;
+  badgeEl.textContent = tf('panel.translated_count', { count: done });
+  listEl.style.setProperty('--wt-pct', total ? Math.round((done / total) * 100) + '%' : '0%');
 }
 
 function escapeHtml(text) {

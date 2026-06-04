@@ -55,6 +55,23 @@ export class PanelRenderer {
   }
 
   /**
+   * Append new slots for paragraphs discovered AFTER the initial extraction
+   * (progressive-loading / infinite-scroll pages).
+   * @param {{id:string, original:string, sortOrder:number}[]} items
+   */
+  appendSlots(items) {
+    this._post({ type: 'APPEND_SLOTS', items });
+  }
+
+  /**
+   * Mark one or more slots as errored so the panel can show an error icon.
+   * @param {string[]} itemIds
+   */
+  markSlotErrors(itemIds) {
+    this._post({ type: 'SLOT_ERROR', itemIds });
+  }
+
+  /**
    * Close the Port connection.
    */
   dispose() {
