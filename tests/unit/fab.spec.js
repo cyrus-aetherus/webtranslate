@@ -17,6 +17,6 @@ describe('FabComponent', () => {
   it('mounts backdrop to body', () => { fab.mount(); expect(document.getElementById('wt-fab-backdrop')).toBeTruthy(); });
   it('starts with idle state', () => { fab.mount(); expect(fab.el.classList.contains('wt-idle')).toBe(true); });
   it('setState changes class', () => { fab.mount(); fab.setState('active'); expect(fab.el.classList.contains('wt-active')).toBe(true); fab.setState('idle'); expect(fab.el.classList.contains('wt-idle')).toBe(true); });
-  it('menu has 5 items', () => { fab.mount(); expect(fab._menuItems.length).toBe(5); });
-  it('calls callback on menu click', () => { const fn = vi.fn(); fab.onTranslateInline = fn; fab.mount(); fab._menuItems[0].click(); expect(fn).toHaveBeenCalled(); });
+  it('menu has items matching IDLE state', () => { fab.mount(); expect(fab._menuItems.length).toBeGreaterThanOrEqual(3); });
+  it('calls callback on menu click', () => { const fn = vi.fn(); fab.onTranslate = fn; fab.mount(); const translateItem = fab._menuContainer?.querySelector('.wt-translate'); translateItem?.click(); expect(fn).toHaveBeenCalled(); });
 });

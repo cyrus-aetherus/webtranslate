@@ -42,14 +42,29 @@ async function init() {
   // --- Phase 1: Mount FAB immediately (synchronous, before any await) ---
   // This ensures the user sees the button even if async steps hang.
   fabComponent = new FabComponent({
-    onTranslateInline: () => toggleTranslation('inline'),
-    onTranslatePanel: () => toggleTranslation('panel'),
+    onTranslate: () => {
+      const st = stateManager?.get();
+      if (st === State.TRANSLATING || st === State.SCANNING) return;
+      if (st === State.PAUSED) startTranslation(currentMode);
+      else startTranslation(currentMode || 'inline');
+    },
+    onPanel: () => {
+      const st = stateManager?.get();
+      if (st === State.TRANSLATING || st === State.SCANNING) return;
+      startTranslation('panel');
+    },
+    onSwitchMode: () => {
+      const to = currentMode === 'panel' ? 'inline' : 'panel';
+      switchMode(to);
+    },
     onDownload: () => handleDownload(),
     onSettings: () => {
       try { chrome.action?.openPopup?.(); } catch (e) {}
       try { chrome.runtime.sendMessage({ type: MSG.OPEN_PANEL }); } catch {}
     },
     onStop: () => stopTranslation(),
+    onRetranslate: () => retranslate(currentMode),
+    onClear: () => clearTranslations(),
   });
   fabComponent.mount(); // creates FAB immediately; loads saved position in background
 
@@ -76,7 +91,7 @@ async function init() {
 
   stateManager = new StateManager();
   stateManager.onChange((to, from) => {
-    updateFabIcon(to);
+    updateFabState(to, from);
     if (to === State.PAUSED && from === State.TRANSLATING) {
       concurrencyController.cancelQueued();
     }
@@ -135,15 +150,31 @@ async function init() {
   console.log(`[WebTranslate] Content script initialized (tab=${TAB_ID})`);
 }
 
-function updateFabIcon(to) {
+function updateFabState(to, from) {
   if (!fabComponent) return;
-  // Map state-machine states to FAB visual states
+  // Map state-machine states to FAB visual states + rebuild menu context
   switch (to) {
     case State.TRANSLATING:
-    case State.SCANNING:  fabComponent.setState('active');  break;
-    case State.PAUSED:    fabComponent.setState('paused');  break;
-    case State.ERROR:     fabComponent.setState('error');   break;
-    default:              fabComponent.setState('idle');    break;
+    case State.SCANNING:
+      fabComponent.setState('active');
+      fabComponent.setModeBadge(currentMode);
+      fabComponent.updateMenu('TRANSLATING', currentMode);
+      break;
+    case State.PAUSED:
+      fabComponent.setState('paused');
+      fabComponent.setModeBadge(null); // hide badge when paused
+      fabComponent.updateMenu('PAUSED', currentMode);
+      break;
+    case State.ERROR:
+      fabComponent.setState('error');
+      fabComponent.setModeBadge(null);
+      fabComponent.updateMenu('ERROR', currentMode);
+      break;
+    default:
+      fabComponent.setState('idle');
+      fabComponent.setModeBadge(currentMode);
+      fabComponent.updateMenu('IDLE', currentMode);
+      break;
   }
 }
 
@@ -157,13 +188,13 @@ async function handleDownload() {
   } catch (err) {
     console.error('[WT] Download failed:', err);
     fabComponent?.setState('error');
-    setTimeout(() => updateFabIcon(stateManager.get()), 2000);
+    setTimeout(() => updateFabState(stateManager.get()), 2000);
   }
 }
 
 function updateDownloadProgress(msg) {
   if (msg.stage === 'done') {
-    setTimeout(() => updateFabIcon(stateManager.get()), 2000);
+    setTimeout(() => updateFabState(stateManager.get()), 2000);
   }
 }
 
@@ -266,17 +297,7 @@ function handleBatchResult(msg) {
 // Translation start / stop
 // ------------------------------------------------------------------
 
-/** Toggle translation on/off.  If IDLE → start; if active → stop. */
-function toggleTranslation(mode) {
-  const st = stateManager.get();
-  if (st === State.IDLE) {
-    startTranslation(mode);
-  } else {
-    stopTranslation();
-  }
-}
-
-/** Stop translation, clean up all observers & timers, reset state. */
+/** Stop translation, clean up all observers & timers, transition to PAUSED. */
 function stopTranslation() {
   batchCollector?.stop();
   observerManager?.stop();
@@ -286,18 +307,57 @@ function stopTranslation() {
   _pendingBatches.clear();
   _onBatchDone = null;
   chrome.runtime.sendMessage({ type: MSG.STOP_ALL, tabId: TAB_ID || 0 });
-  chrome.storage.local.set({ wt_active: false }).catch(() => {});
-  stateManager?.transition(State.IDLE);
+  chrome.storage.session.set({ wt_active: false }).catch(() => {});
+  // Transition to PAUSED instead of IDLE — keeps translated DOM visible,
+  // allows user to Clear, Retranslate, or Resume.
+  stateManager?.transition(State.PAUSED);
   fabComponent?.highlightMode(null);
-  fabComponent?.setState('idle');
+  fabComponent?.setState('paused');
   panelRenderer?.dispose();
+}
+
+/** Clear all inline translation blocks from DOM, keep cache, go IDLE. */
+function clearTranslations() {
+  inlineRenderer?.clearAll();
+  stateManager?.transition(State.IDLE);
+  fabComponent?.setState('idle');
+}
+
+/** Clear DOM + cache, then restart translation with fresh API calls. */
+function retranslate(mode) {
+  inlineRenderer?.clearAll();
+  cacheManager?.clear();
+  // Clear pending state
+  _pendingFingerprints.clear();
+  _pendingBatches.clear();
+  _onBatchDone = null;
+  stateManager?.transition(State.IDLE);
+  startTranslation(mode);
+}
+
+/** Switch from Inline to Panel or vice versa without stopping translation. */
+function switchMode(to) {
+  // Stop current mode
+  batchCollector?.stop();
+  observerManager?.stop();
+  concurrencyController?.cancelQueued();
+  if (window._wtDisposeScroll) { window._wtDisposeScroll.forEach(fn => fn()); window._wtDisposeScroll = []; }
+  _pendingFingerprints.clear();
+  _pendingBatches.clear();
+  _onBatchDone = null;
+  chrome.runtime.sendMessage({ type: MSG.STOP_ALL, tabId: TAB_ID || 0 });
+  stateManager.transition(State.IDLE);
+  panelRenderer?.dispose();
+  // Start new mode — cached paragraphs will render instantly
+  startTranslation(to);
 }
 
 async function startTranslation(mode = currentMode) {
   currentMode = mode;
 
   // Persist active state so translation auto-starts on next visit
-  chrome.storage.local.set({ wt_active: true, wt_autoMode: mode }).catch(() => {});
+  // Use session storage — scoped to this tab/window, won't auto-start in new tabs.
+  chrome.storage.session.set({ wt_active: true, wt_autoMode: mode }).catch(() => {});
   fabComponent?.highlightMode(mode);
   // Set active state immediately (belt-and-suspenders)
   fabComponent?.setState('active');
@@ -568,10 +628,22 @@ function showConfigToast() {
 /** Auto-start translation if the user previously enabled it. */
 async function maybeAutoStart() {
   try {
-    const cfg = await chrome.storage.local.get(['wt_autoMode', 'wt_active']);
+    // Use session storage — scoped to this specific tab, won't bleed to other tabs
+    const cfg = await chrome.storage.session.get(['wt_autoMode', 'wt_active']);
     if (cfg.wt_active && cfg.wt_autoMode) {
       console.log('[WT] Auto-starting translation in', cfg.wt_autoMode, 'mode');
+      currentMode = cfg.wt_autoMode;
       startTranslation(cfg.wt_autoMode);
+    } else {
+      // Fallback: check local storage for default mode (legacy)
+      const localCfg = await chrome.storage.local.get(['defaultMode']);
+      currentMode = localCfg.defaultMode || 'inline';
     }
-  } catch {}
+  } catch {
+    // session storage may not be available in some contexts
+    try {
+      const localCfg = await chrome.storage.local.get(['defaultMode']);
+      currentMode = localCfg.defaultMode || 'inline';
+    } catch {}
+  }
 }

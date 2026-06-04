@@ -66,6 +66,11 @@ const HARDCODED_EN_FALLBACK = {
 
   'fab.translate_inline': 'Inline Translate',
   'fab.translate_panel': 'Panel Translate',
+  'fab.translate': 'Translate',
+  'fab.switch_to_inline': 'Switch to Inline',
+  'fab.switch_to_panel': 'Switch to Panel',
+  'fab.retranslate': 'Retranslate',
+  'fab.clear': 'Clear',
   'fab.download': 'Download Page',
   'fab.settings': 'Settings',
   'fab.stop': 'Stop',
