@@ -1,150 +1,104 @@
 # WebTranslate
 
-[![Build](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/yourname/webtranslate)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![Node](https://img.shields.io/badge/node-%3E%3D20-orange)](.nvmrc)
+[![Chrome](https://img.shields.io/badge/chrome-%3E%3D114-brightgreen)](https://www.google.com/chrome/)
 
 > LLM-powered webpage translation Chrome extension. Translate any page inline or via side panel, with one-click download as Markdown.
 
 [English](README.md) · [中文](README.zh.md)
 
-<!-- TODO: add a demo GIF here -->
+---
+
+## What It Does
+
+Click the floating button on any webpage, and WebTranslate translates the article content in-place using your own LLM API key. No page reload, no copy-paste.
+
+![FAB with IDLE menu](docs/screenshot-1-idle-menu.png)
+
+---
+
+## How to Use
+
+### 1. Install the extension
+
+```bash
+npm install && npm run build
+```
+
+Load the `dist/` folder in `chrome://extensions/` (Developer mode → Load unpacked).
+
+### 2. Configure your API
+
+Click the extension icon to open the popup settings. Enter your API URL, Key, and model name.
+
+![Popup settings](docs/screenshot-4-popup.png)
+
+**Supported providers:** OpenAI, DeepSeek, Anthropic, or any OpenAI-compatible endpoint.
+
+### 3. Start translating
+
+Navigate to any article page. Click the floating action button (FAB) in the bottom-right corner, then click **Translate**.
+
+![Translation in progress](docs/screenshot-2-translating.png)
+
+Translations appear inline below each paragraph. A progress bar at the top shows how many paragraphs have been processed.
+
+### 4. Pause, clear, or retranslate
+
+Click **Stop** to pause translation. The FAB turns yellow and automatically expands to show your options:
+
+![PAUSED state with menu](docs/screenshot-3-paused-menu.png)
+
+| Action | What it does |
+|--------|-------------|
+| **Translate** | Resume translation (instant for cached paragraphs) |
+| **Retranslate** | Clear cache and re-translate everything (e.g. after changing models) |
+| **Clear** | Remove all translation blocks from the page, keeping the cache warm |
+
+### 5. Download the page
+
+In the FAB menu, click **Download Page** to save the article as a ZIP file containing Markdown text and images.
 
 ---
 
 ## Features
 
 ### Dual Translation Modes
+- **Inline** — translations appear below each paragraph on the page
+- **Panel** — translations displayed in Chrome's Side Panel, leaving the original page unchanged
 
-| Mode | Description |
-|------|-------------|
-| **Inline** | Inserts translation below each paragraph. Isolated styles, no DOM pollution. |
-| **Panel** | Displays translations in Chrome Side Panel. Zero modification to the page. |
-
-### Text-Driven Extraction
-
-- Extracts semantic tags (`<p>`, `<h1>`–`<h6>`, `<li>`, etc.) **and** any element with sufficient direct text (`<div>`, `<span>`, custom elements).
-- Auto-excludes navigation, ads, code blocks, and interactive UI.
-
-### Viewport-First Lazy Loading
-
-- `IntersectionObserver` monitors visible paragraphs. No full-page scan on startup.
-- Preloads content within `rootMargin` before it enters the viewport.
+### Smart Content Extraction
+- Extracts semantic tags (`<p>`, `<h1>`–`<h6>`, `<li>`) and any element with enough direct text
+- Auto-excludes navigation, ads, code blocks, sidebars, and interactive UI
 
 ### Batch Translation
+- Groups up to 8 paragraphs per API call, reducing API costs
 
-- Merges up to **8 paragraphs** (≤800 chars) per API call with a unique separator protocol.
-- Eliminates N+1 API requests.
+### Caching
+- Three-tier cache (memory → session → storage) means re-translating the same page is instant
 
-### Two-Level Deduplication
+### Cost Tracking
+- View token usage and estimated cost in the popup's Statistics tab
 
-- **L1 DOM marker** (`data-wt-done`) prevents duplicate rendering.
-- **L2 Content fingerprint** (stable djb2 hash) survives SPA re-renders.
-
-### Resilient & Secure
-
-- Exponential backoff, circuit breaker (pause after 5 consecutive failures), 429 rate-limit handling.
-- DOMPurify sanitization, Shadow DOM isolation, API Key stored only in `chrome.storage.local`, HTTPS enforced.
-
-### Download as ZIP
-
-- Markdown + images packaged via JSZip, delivered via Data URL.
-
----
-
-## Quick Start
-
-### 1. Install Dependencies
-
-```bash
-npm install
-```
-
-### 2. Build
-
-```bash
-npm run build    # Production build → dist/
-npm run dev      # Vite watch mode
-```
-
-### 3. Load in Chrome
-
-1. Open `chrome://extensions/`
-2. Enable **Developer mode**
-3. Click **Load unpacked** → select the `dist/` folder
-
-### 4. Configure API
-
-1. Click the extension icon → **Settings**
-2. Enter your API URL, Key, and select a model
-3. Supported adapters: OpenAI-compatible, DeepSeek, Anthropic
+### Resilient
+- Exponential backoff, rate-limit handling, circuit breaker against persistent failures
 
 ---
 
 ## Development
 
 ```bash
-npm test         # Run all tests (unit + integration)
-npm run lint     # ESLint check
+npm install
+npm run build    # Production build → dist/
+npm test         # Run 150+ unit & integration tests
+npm run lint     # ESLint
 ```
 
-**Test Coverage**
+**Tech Stack:** Chrome Extension Manifest V3 · Vanilla ES2022 · Vite · Vitest · JSZip · DOMPurify · turndown
 
-| Category | Count |
-|----------|-------|
-| Unit tests | 110 |
-| Integration tests | 3 |
-
----
-
-## Architecture
-
-📐 **Detailed diagrams**
-- [English](docs/architecture-en.md)
-- [中文](docs/architecture-zh.md)
-
-| Layer | Components | Environment |
-|-------|------------|-------------|
-| Content Script | `BatchCollector`, `StateManager`, `ObserverManager`, `InlineRenderer` | Page sandbox |
-| Service Worker | `ApiProxy`, `DownloadManager`, `ConfigStore` | Background process |
-| Storage | `chrome.storage.local` (config) / `chrome.storage.session` (cache) | Browser persistent layer |
-
----
-
-## Tech Stack
-
-- Chrome Extension **Manifest V3**
-- Vanilla **ES2022** (no framework, minimal bundle)
-- **Vite** + **Vitest**
-- **JSZip**, **DOMPurify**, **turndown.js**
-
----
-
-## Project Structure
-
-```
-webtranslate/
-├── manifest.json
-├── src/
-│   ├── background/          # Service Worker
-│   │   ├── sw.js
-│   │   ├── api-proxy.js
-│   │   ├── download-manager.js
-│   │   ├── config-store.js
-│   │   └── adapters/        # OpenAI, Anthropic
-│   ├── content/             # Content Script
-│   │   ├── content.js
-│   │   ├── extractor/       # Text-driven extraction
-│   │   ├── renderers/       # Inline & Panel renderers
-│   │   └── styles/
-│   ├── panel/               # Side Panel UI
-│   ├── popup/               # Settings popup
-│   └── shared/              # Constants, i18n, utils
-├── tests/
-│   ├── unit/
-│   └── integration/
-└── vite.config.js
-```
+**Docs:**
+- [UI Interaction Design](docs/ui-interaction-design.md)
+- [Architecture (English)](docs/architecture-en.md) · [Architecture (中文)](docs/architecture-zh.md)
 
 ---
 

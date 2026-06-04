@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>WebTranslate Demo — Blog Article</title>
+<style>
+  body{font-family:Georgia,serif;max-width:720px;margin:0 auto;padding:20px;line-height:1.6;color:#333}
+  nav{background:#f5f5f5;padding:10px;margin-bottom:20px}
+  nav a{color:#6750a4;margin-right:20px;text-decoration:none}
+  article h1{font-size:2em;margin-top:0}
+  article h2{font-size:1.4em;margin-top:1.5em}
+  article p{margin:1em 0}
+  article li{margin:.5em 0}
+  .ad{background:#ffeb3b;padding:10px;margin:10px 0;font-size:12px}
+  footer{color:#999;font-size:12px;margin-top:40px;padding-top:10px;border-top:1px solid #eee}
+</style>
+<link rel="stylesheet" href="content.css">
+</head>
+<body>
+<nav><a href="#">Home</a><a href="#">About</a><a href="#">Blog</a></nav>
+<article>
+  <h1>The Future of Large Language Models</h1>
+  <p>Large language models have transformed the way we interact with technology. From chatbots to code assistants, their impact is undeniable.</p>
+  <p>In this article, we explore the evolution of transformers, the scaling laws that govern their performance, and the emerging techniques for efficient inference.</p>
+  <p>One key insight is that model capabilities often emerge unpredictably as scale increases. This phenomenon, known as emergent abilities, challenges our understanding of intelligence.</p>
+  <h2>Key Findings</h2>
+  <ul>
+    <li>Scaling continues to improve performance across diverse tasks.</li>
+    <li>Alignment techniques like RLHF are essential for safe deployment.</li>
+    <li>Multimodal models bridge the gap between text, vision, and audio.</li>
+  </ul>
+  <p>Looking ahead, the next generation of models will likely integrate reasoning capabilities more deeply, enabling complex problem-solving in scientific domains.</p>
+</article>
+<div class="ad">Sponsored: Buy our product now!</div>
+<footer>© 2026 Blog Inc. All rights reserved.</footer>
+
+<script>
+// Mock Chrome APIs for demo
+(()=>{
+  const SS={}, LS={wt_language:'en',apiUrl:'https://api.openai.com',apiKey:'sk-demo12345678',model:'gpt-4o',adapter:'openai',sourceLang:'auto',targetLang:'zh-CN',defaultMode:'inline',concurrency:3,maxBatchChars:800};
+  window.chrome={
+    runtime:{
+      sendMessage:async(m)=>{
+        if(m.type==='GET_TAB_ID')return{tabId:1};
+        if(m.type==='OPEN_SIDE_PANEL')return{ok:true};
+        if(m.type==='TRANSLATE_BATCH'){
+          setTimeout(()=>window.dispatchEvent(new CustomEvent('wtb',{detail:{type:'TRANSLATE_BATCH_RESULT',batchId:m.batchId,results:m.items.map(i=>({id:i.id,translation:'[中文] '+i.text.slice(0,35)+(i.text.length>35?'…':'')}))}})),250);
+          return{ok:true};
+        }
+        if(m.type==='STOP_ALL')return{ok:true};
+        if(m.type==='DOWNLOAD')return{ok:true,downloadId:m.downloadId};
+        if(m.type==='GET_STATS')return{alltime:{calls:0,segments:0,promptTokens:0,completionTokens:0,errors:0}};
+        return{ok:true};
+      },
+      onMessage:{addListener(cb){window._mc=cb},removeListener(){}},
+      getURL:p=>p.replace(/^src\//,''),
+      connect:()=>({postMessage(){},disconnect(){},onDisconnect:{addListener(){}}}),
+    },
+    storage:{
+      local:{get(ks){const o={};if(Array.isArray(ks))ks.forEach(k=>{if(k in LS)o[k]=LS[k]});else if(ks&&typeof ks==='object')Object.entries(ks).forEach(([k,v])=>{o[k]=k in LS?LS[k]:v});return Promise.resolve(o)},set(i){Object.assign(LS,i);return Promise.resolve()},onChanged:{addListener(){},removeListener(){}}},
+      session:{get(ks){const o={};if(Array.isArray(ks))ks.forEach(k=>{if(k in SS)o[k]=SS[k]});else if(ks&&typeof ks==='object')Object.entries(ks).forEach(([k,v])=>{o[k]=k in SS?SS[k]:v});return Promise.resolve(o)},set(i){Object.assign(SS,i);return Promise.resolve()}},
+    },
+    action:{openPopup(){return Promise.resolve()}},
+    downloads:{download(){return Promise.resolve(1)}},
+    tabs:{sendMessage(){return Promise.resolve()}},
+  };
+  window.addEventListener('wtb',e=>{if(window._mc)window._mc(e.detail)});
+})();
+</script>
+<script src="content.js"></script>
+</body>
+</html>

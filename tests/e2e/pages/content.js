@@ -1100,6 +1100,8 @@
     'toast.config_hint': 'Set your API URL, Key and Model — translation starts automatically once saved.',
     'toast.open_settings': 'Open Settings',
     'toast.dismiss': 'Dismiss',
+    'toast.panel_unavailable': 'Panel mode unavailable',
+    'toast.panel_fallback': 'Switched to inline mode.',
   };
 
   /** @type {{locale:string, messages:Record<string,string>, ready:boolean}} */
@@ -1293,7 +1295,12 @@
   /**
    * PanelRenderer - Pushes translation results to the Chrome Side Panel
    * via chrome.runtime.connect long-lived Port.
+   *
+   * chrome.sidePanel.open() is only available in the Service Worker context,
+   * NOT in content scripts.  We delegate the open call via SW message.
    */
+
+  const PORT_CS_NAME = 'wt-panel-cs';
 
   class PanelRenderer {
     constructor(tabId) {
@@ -1303,18 +1310,19 @@
     }
 
     /**
-     * Open the side panel and establish a Port connection.
+     * Open the side panel (via SW) and establish a Port connection.
      * @returns {Promise<boolean>} true if panel opened successfully
      */
     async open() {
-      // Try native sidePanel API (MV3)
-      if (chrome.sidePanel) {
-        try {
-          await chrome.sidePanel.open({ tabId: this.tabId });
-        } catch (err) {
-          console.warn('[WT] sidePanel.open failed:', err.message);
+      try {
+        const res = await chrome.runtime.sendMessage({ type: 'OPEN_SIDE_PANEL', tabId: this.tabId });
+        if (!res || !res.ok) {
+          console.warn('[WT] SW failed to open side panel:', res?.error || 'unknown');
           return false;
         }
+      } catch (err) {
+        console.warn('[WT] OPEN_SIDE_PANEL message failed:', err.message);
+        return false;
       }
 
       this._connect();
@@ -1329,10 +1337,10 @@
       if (!this._connected) {
         this._connect();
       }
-      this.port?.postMessage({
-        type: 'BATCH_RESULT',
-        items,
-      });
+      if (!this.port) return;
+      try {
+        this.port.postMessage({ type: 'BATCH_RESULT', items });
+      } catch { /* port may have disconnected */ }
     }
 
     /**
@@ -1348,11 +1356,9 @@
 
     _connect() {
       if (this.port) return;
-
       try {
-        this.port = chrome.runtime.connect({ name: `wt-panel-${this.tabId}` });
+        this.port = chrome.runtime.connect({ name: PORT_CS_NAME });
         this._connected = true;
-
         this.port.onDisconnect.addListener(() => {
           this._connected = false;
           this.port = null;
@@ -3033,7 +3039,17 @@
 
   /** Switch from Inline to Panel or vice versa without stopping translation. */
   function switchMode(to) {
-    // Stop current mode
+    // Clear DOM from the departing mode
+    if (currentMode === 'inline' && to === 'panel') {
+      inlineRenderer?.clearAll();
+    }
+    if (currentMode === 'panel' && to === 'inline') {
+      panelRenderer?.dispose();
+    }
+
+    // Stop active pipeline without flashing IDLE state on FAB.
+    // startTranslation() handles the SCANNING→TRANSLATING transition itself
+    // and returns early if another batch is already in flight.
     batchCollector?.stop();
     observerManager?.stop();
     concurrencyController?.cancelQueued();
@@ -3042,9 +3058,9 @@
     _pendingBatches.clear();
     _onBatchDone = null;
     chrome.runtime.sendMessage({ type: MSG.STOP_ALL, tabId: TAB_ID || 0 });
-    stateManager.transition(State.IDLE);
-    panelRenderer?.dispose();
-    // Start new mode — cached paragraphs will render instantly
+
+    // Set mode BEFORE startTranslation so it picks up the correct mode
+    currentMode = to;
     startTranslation(to);
   }
 
@@ -3085,9 +3101,18 @@
       return;
     }
 
-    // For panel mode, open the side panel first
+    // For panel mode, open the side panel first.
+    // If the panel cannot be opened (sidePanel permission not granted, or
+    // API not available), fall back to inline mode and let the user know.
     if (currentMode === 'panel') {
-      await panelRenderer.open();
+      const opened = await panelRenderer.open();
+      if (!opened) {
+        currentMode = 'inline';
+        fabComponent?.setModeBadge('inline');
+        fabComponent?.updateMenu('IDLE', 'inline');
+        fabComponent?.updateLabels(t);
+        showPanelUnavailableToast();
+      }
     }
 
     // Build items sorted top-down by DOM position
@@ -3262,6 +3287,40 @@
     } else {
       init().then(setupResilience).then(maybeAutoStart);
     }
+  }
+
+  /** Inform the user that the side panel is unavailable and we fell back to inline. */
+  function showPanelUnavailableToast() {
+    if (document.getElementById('wt-toast-panel')) return;
+    const toast = document.createElement('div');
+    toast.id = 'wt-toast-panel';
+    toast.className = 'wt-config-toast';
+    toast.innerHTML = `
+    <span style="display:flex;align-items:center;gap:10px;">
+      <span style="font-size:20px;">ℹ️</span>
+      <span style="font-weight:600;font-size:14px;color:#1f2937;">${t('toast.panel_unavailable')}</span>
+    </span>
+    <span style="color:#6b7280;font-size:13px;margin:4px 0 0 30px;">${t('toast.panel_fallback')}</span>`;
+    Object.assign(toast.style, {
+      position:'fixed',top:'16px',left:'50%',zIndex:'2147483647',
+      display:'flex',flexDirection:'column',padding:'16px 20px',
+      background:'#fff',color:'#1f2937',
+      fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif',
+      borderRadius:'14px',boxShadow:'0 12px 40px rgba(0,0,0,.18)',
+      maxWidth:'440px',width:'calc(100vw - 32px)',
+      animation:'wt-slide-in .35s cubic-bezier(.34,1.56,.64,1)',
+      transform:'translateX(-50%)',
+    });
+    setTimeout(() => {
+      if (toast.parentNode) { toast.style.opacity='0'; toast.style.transition='opacity .3s'; setTimeout(()=>toast.remove(),300); }
+    }, 5000);
+    const styleId = 'wt-toast-kf';
+    if (!document.getElementById(styleId)) {
+      const s = document.createElement('style'); s.id = styleId;
+      s.textContent = '@keyframes wt-slide-in{from{transform:translate(-50%,-100%);opacity:0}to{transform:translate(-50%,0);opacity:1}}';
+      document.head.appendChild(s);
+    }
+    document.body.appendChild(toast);
   }
 
   /** Show a friendly toast when API is not configured, with a quick link. */
