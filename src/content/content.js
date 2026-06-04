@@ -244,14 +244,16 @@ const _pendingBatches = new Map();
 // Set of fingerprints currently awaiting API results — prevents
 // duplicate submissions on rapid scroll.
 const _pendingFingerprints = new Set();
-// Per-page storage keys keyed by URL hash — survives refresh, isolated per page.
-const _pageId = (() => {
-  const u = location.origin + location.pathname;
-  let h = 0;
-  for (let i = 0; i < u.length; i++) { h = ((h << 5) - h) + u.charCodeAt(i); h |= 0; }
-  return (h >>> 0).toString(16).slice(0, 8);
+// Per-tab identity via sessionStorage UUID — survives refresh, NOT shared
+// across tabs.  Ensures opening the same URL in a new tab does not inherit
+// the previous tab's auto-start state.
+const _tabId = (() => {
+  const K = 'wt_tab_uuid';
+  let id = sessionStorage.getItem(K);
+  if (!id) { id = crypto.randomUUID(); sessionStorage.setItem(K, id); }
+  return id;
 })();
-const _stKey = (name) => `wt_${name}_${_pageId}`;
+const _stKey = (name) => `wt_${name}_${_tabId}`;
 
 // Callback for sequential top-down batch processing (set by startTranslation)
 let _onBatchDone = null;
