@@ -182,10 +182,17 @@ chrome.runtime.onSuspend?.addListener(() => {
  */
 (() => {
   let panelReceiver = null;
+  /** @type {object[]} buffered messages waiting for panel to connect */
+  const pending = [];
 
   chrome.runtime.onConnect.addListener((port) => {
     if (port.name === 'wt-panel-receiver') {
       panelReceiver = port;
+      // Flush any messages that arrived before the panel was ready
+      for (const msg of pending) {
+        try { panelReceiver.postMessage(msg); } catch { panelReceiver = null; break; }
+      }
+      pending.length = 0;
       port.onDisconnect.addListener(() => { panelReceiver = null; });
       return;
     }
@@ -194,6 +201,9 @@ chrome.runtime.onSuspend?.addListener(() => {
       port.onMessage.addListener((msg) => {
         if (panelReceiver) {
           try { panelReceiver.postMessage(msg); } catch { panelReceiver = null; }
+        } else {
+          // Panel not yet connected — buffer until it is ready
+          pending.push(msg);
         }
       });
       return;
