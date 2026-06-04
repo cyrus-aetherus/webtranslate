@@ -183,13 +183,19 @@ function getMenuItems(state, mode) {
       ];
     }
     case 'PAUSED': {
-      return [
+      const items = [
         { icon: MENU_ICONS.translate, i18nKey: 'fab.resume', cls: 'wt-translate', primary: true },
         { icon: MENU_ICONS.retranslate, i18nKey: 'fab.retranslate', cls: 'wt-retranslate', primary: false },
-        { icon: MENU_ICONS.clear, i18nKey: 'fab.clear', cls: 'wt-clear', primary: false },
+      ];
+      // Hide only makes sense in Inline mode (removes DOM blocks)
+      if (mode === 'inline') {
+        items.push({ icon: MENU_ICONS.clear, i18nKey: 'fab.clear', cls: 'wt-clear', primary: false });
+      }
+      items.push(
         { icon: MENU_ICONS.download, i18nKey: 'fab.download', cls: 'wt-download', primary: false },
         { icon: MENU_ICONS.settings, i18nKey: 'fab.settings', cls: 'wt-settings', primary: false },
-      ];
+      );
+      return items;
     }
     case 'ERROR':
     default: {
