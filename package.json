@@ -1,7 +1,19 @@
 {
   "name": "webtranslate",
   "version": "1.0.0",
-  "description": "基于大模型 API 的网页翻译与下载工具",
+  "description": "A browser extension for webpage translation and download powered by LLM APIs",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/huanying-dapeng/webtranslate.git"
+  },
+  "keywords": [
+    "browser-extension",
+    "translation",
+    "llm",
+    "chrome-extension",
+    "webpage-translator"
+  ],
   "type": "module",
   "scripts": {
     "dev": "vite",
