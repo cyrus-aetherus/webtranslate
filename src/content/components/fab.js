@@ -54,6 +54,10 @@ const CSS = `
 #wt-fab.wt-error .wt-fab-ring{stroke:#b3261e;fill:none;}
 #wt-fab.wt-error .wt-fab-bracket{stroke:#b3261e;fill:none;}
 
+/* Pulse animation — draws attention when paused */
+#wt-fab.wt-pulse{animation:wt-pulse .6s ease;}
+@keyframes wt-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.18)}}
+
 /* ---- Mode badge ---- */
 #wt-fab .wt-mode-badge{position:absolute;top:-2px;right:-2px;
   width:18px;height:18px;border-radius:50%;
@@ -250,6 +254,24 @@ export class FabComponent {
   setState(s) {
     this.el?.classList.remove('wt-idle', 'wt-active', 'wt-paused', 'wt-error');
     this.el?.classList.add('wt-' + s);
+  }
+
+  /** Brief scale pulse to draw user attention, then clean up. */
+  pulse() {
+    if (!this.el) return;
+    this.el.classList.add('wt-pulse');
+    this.el.addEventListener('animationend', () => {
+      this.el.classList.remove('wt-pulse');
+    }, { once: true });
+  }
+
+  /** Open the menu, then auto-close after `duration` ms. */
+  autoExpand(duration) {
+    if (!this._open) this._openMenu();
+    clearTimeout(this._autoExpandTimer);
+    this._autoExpandTimer = setTimeout(() => {
+      if (this._open) this._close();
+    }, duration);
   }
 
   /**

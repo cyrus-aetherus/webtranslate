@@ -163,9 +163,12 @@ function updateFabState(to, from) {
       break;
     case State.PAUSED:
       fabComponent.setState('paused');
-      fabComponent.setModeBadge(null); // hide badge when paused
+      fabComponent.setModeBadge(null);
       fabComponent.updateMenu('PAUSED', currentMode);
       fabComponent.updateLabels(t);
+      // Auto-expand menu so user discovers Clear/Retranslate
+      fabComponent.pulse();
+      setTimeout(() => fabComponent.autoExpand(3000), 400);
       break;
     case State.ERROR:
       fabComponent.setState('error');
