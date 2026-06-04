@@ -158,6 +158,7 @@ async function handleDownload(message, tabId) {
  */
 async function openSidePanel(tabId) {
   if (chrome.sidePanel && tabId) {
+    _panelTabId = tabId;
     await chrome.sidePanel.open({ tabId });
   } else {
     throw new Error('chrome.sidePanel not available or no tabId');
@@ -180,6 +181,8 @@ chrome.runtime.onSuspend?.addListener(() => {
  * Only one side panel is open at a time, so a single receiver port covers
  * all tabs.  CS ports use `wt-panel-cs`; the panel uses `wt-panel-receiver`.
  */
+let _panelTabId = -1;
+
 (() => {
   let panelReceiver = null;
   /** @type {object[]} buffered messages waiting for panel to connect */
@@ -193,6 +196,12 @@ chrome.runtime.onSuspend?.addListener(() => {
         try { panelReceiver.postMessage(msg); } catch { panelReceiver = null; break; }
       }
       pending.length = 0;
+      // Listen for messages FROM the panel (SCROLL_TO, etc.)
+      port.onMessage.addListener((msg) => {
+        if (msg.type === 'SCROLL_TO' && _panelTabId > 0) {
+          chrome.tabs.sendMessage(_panelTabId, msg).catch(() => {});
+        }
+      });
       port.onDisconnect.addListener(() => { panelReceiver = null; });
       return;
     }
@@ -202,7 +211,6 @@ chrome.runtime.onSuspend?.addListener(() => {
         if (panelReceiver) {
           try { panelReceiver.postMessage(msg); } catch { panelReceiver = null; }
         } else {
-          // Panel not yet connected — buffer until it is ready
           pending.push(msg);
         }
       });

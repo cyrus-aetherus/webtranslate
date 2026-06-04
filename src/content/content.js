@@ -137,6 +137,13 @@ async function init() {
     if (msg.type === MSG.DOWNLOAD_PROGRESS) {
       updateDownloadProgress(msg);
     }
+    if (msg.type === 'SCROLL_TO') {
+      // Try original paragraph element (stores wtPgId via markTranslated)
+      let el = document.querySelector(`[data-wt-pg-id="${msg.paragraphId}"]`);
+      // Fallback: inline translation block (stores wtId via InlineRenderer)
+      if (!el) el = document.querySelector(`.wt-inline-block[data-wt-id="${msg.paragraphId}"]`);
+      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    }
   });
 
   // Watch for API config changes — auto-start translation when user
@@ -512,7 +519,7 @@ async function startTranslation(mode = currentMode) {
       if (it.element.dataset.wtDone || _pendingFingerprints.has(it.fingerprint)) continue;
       const cached = cacheManager?.get(it.fingerprint);
       if (cached) {
-        markTranslated(it.element, it.fingerprint);
+        markTranslated(it.element, it.fingerprint, it.id);
         if (currentMode === 'inline') {
           inlineRenderer.render(it.element, cached, it.id);
         } else {
@@ -550,7 +557,7 @@ async function startTranslation(mode = currentMode) {
         if (currentMode === 'inline') {
           const next = el.nextElementSibling;
           if (next?.classList?.contains('wt-inline-block')) continue;
-          markTranslated(el, fp);
+          markTranslated(el, fp, id);
           inlineRenderer.render(el, cached, id);
         } else {
           // Panel mode: fill cached translation into the matching slot

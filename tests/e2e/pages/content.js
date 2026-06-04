@@ -1334,13 +1334,35 @@
      * @param {{id:string, original:string, translation:string}[]} items
      */
     renderBatch(items) {
-      if (!this._connected) {
-        this._connect();
-      }
-      if (!this.port) return;
-      try {
-        this.port.postMessage({ type: 'BATCH_RESULT', items });
-      } catch { /* port may have disconnected */ }
+      this._post({ type: 'BATCH_RESULT', items });
+    }
+
+    /**
+     * Send the full slot list to the panel so it can render placeholders
+     * for every paragraph BEFORE any translations arrive.  The panel
+     * creates empty slots ordered by sortOrder; subsequent BATCH_RESULT
+     * messages fill them in-place, guaranteeing correct visual order.
+     * @param {{id:string, original:string, sortOrder:number}[]} items
+     */
+    initSlots(items) {
+      this._post({ type: 'INIT_SLOTS', items });
+    }
+
+    /**
+     * Append new slots for paragraphs discovered AFTER the initial extraction
+     * (progressive-loading / infinite-scroll pages).
+     * @param {{id:string, original:string, sortOrder:number}[]} items
+     */
+    appendSlots(items) {
+      this._post({ type: 'APPEND_SLOTS', items });
+    }
+
+    /**
+     * Mark one or more slots as errored so the panel can show an error icon.
+     * @param {string[]} itemIds
+     */
+    markSlotErrors(itemIds) {
+      this._post({ type: 'SLOT_ERROR', itemIds });
     }
 
     /**
@@ -1367,6 +1389,12 @@
         console.warn('[WT] Port connection failed:', err.message);
         this._connected = false;
       }
+    }
+
+    _post(msg) {
+      if (!this._connected) this._connect();
+      if (!this.port) return;
+      try { this.port.postMessage(msg); } catch { /* panel may have closed */ }
     }
   }
 
@@ -2745,6 +2773,15 @@
       },
       onPanel: () => {
         const st = stateManager?.get();
+        // Panel mode re-open: if already translating in panel mode, re-init slots
+        // so the panel (which may have been closed-and-reopened) gets fresh slot data.
+        if ((st === State.TRANSLATING || st === State.SCANNING) && currentMode === 'panel') {
+          panelRenderer?.open().then(opened => {
+            if (!opened) return;
+            reinitPanelSlots();
+          }).catch(() => {});
+          return;
+        }
         if (st === State.TRANSLATING || st === State.SCANNING) return;
         startTranslation('panel');
       },
@@ -2952,7 +2989,7 @@
           tabId: TAB_ID,
           batchId,
           items: uncached.map((it) => ({
-            id: it.id, fingerprint: it.fingerprint, text: it.text,
+            id: it.id, fingerprint: it.fingerprint, text: it.text, sortOrder: it.sortOrder,
           })),
         });
       } catch (err) {
@@ -2975,6 +3012,11 @@
     if (error || !results) {
       console.error('[WT] Batch result error:', error);
       circuitBreaker?.recordFailure();
+      // In Panel mode, mark the corresponding slots as errored so the user
+      // sees which paragraphs failed instead of waiting forever.
+      if (currentMode === 'panel' && items) {
+        panelRenderer.markSlotErrors(items.map(it => it.id));
+      }
       return;
     }
 
@@ -2986,8 +3028,12 @@
       if (currentMode === 'inline') {
         inlineRenderer.render(original.element, r.translation, original.id);
       } else {
+        // Panel mode: send result directly with sortOrder.
+        // The panel has pre-created slots from INIT_SLOTS — it fills
+        // the matching slot in-place, preserving paragraph order.
         panelRenderer.renderBatch([{
           id: original.id, original: original.text, translation: r.translation,
+          sortOrder: original.sortOrder ?? 0,
         }]);
       }
     }
@@ -3115,7 +3161,9 @@
       }
     }
 
-    // Build items sorted top-down by DOM position
+    // Build items sorted top-down by DOM position.  Assign a sortOrder
+    // so the panel can reconstruct correct paragraph order regardless of
+    // concurrent batch completion timing.
     const items = paragraphs.map((el) => {
       const id = generateParagraphId(el);
       const fingerprint = computeFingerprint(el);
@@ -3125,14 +3173,24 @@
       const pos = a.element.compareDocumentPosition(b.element);
       return (pos & Node.DOCUMENT_POSITION_PRECEDING) ? 1 : -1;
     });
+    items.forEach((it, i) => { it.sortOrder = i; });
 
     batchCollector.start();
     observerManager.start(document.body);
 
     for (const item of items) {
       batchCollector.observeElement(item.element, {
-        id: item.id, fingerprint: item.fingerprint, text: item.text,
+        id: item.id, fingerprint: item.fingerprint, text: item.text, sortOrder: item.sortOrder,
       });
+    }
+
+    // Panel mode: send all slots (with empty translations) so the panel
+    // renders placeholders immediately.  Subsequent BATCH_RESULT messages
+    // fill individual slots by sortOrder — order is guaranteed by DOM position.
+    if (currentMode === 'panel') {
+      panelRenderer.initSlots(items.map(it => ({
+        id: it.id, original: it.text, sortOrder: it.sortOrder,
+      })));
     }
 
     // Translate top-down, one batch at a time, showing progress bar
@@ -3194,28 +3252,46 @@
       onBatchReady(batch);
     };
 
-    // Scroll-driven scanner: re-render cached, submit new batches
+    // Scroll-driven scanner: re-render cached, submit new batches.
+    // In Panel mode this handles progressive-loading pages: new paragraphs
+    // get appended as slots, cached ones fill existing slots.
     const _flushVisible = () => {
       if (stateManager.get() !== State.TRANSLATING) return;
       const fresh = extractParagraphs();
       const needs = [];
+      const newSlots = [];
+
       for (const el of fresh) {
+        const id = generateParagraphId(el);
         const fp = computeFingerprint(el);
         const rect = el.getBoundingClientRect();
         if (rect.top >= window.innerHeight + 400 || rect.bottom <= -400) continue;
         if (_pendingFingerprints.has(fp)) continue;
+
         const cached = cacheManager?.get(fp);
         if (cached) {
-          // Skip if already rendered (adjacent block exists)
-          const next = el.nextElementSibling;
-          if (next?.classList?.contains('wt-inline-block')) continue;
-          markTranslated(el, fp);
           if (currentMode === 'inline') {
-            inlineRenderer.render(el, cached, generateParagraphId(el));
+            const next = el.nextElementSibling;
+            if (next?.classList?.contains('wt-inline-block')) continue;
+            markTranslated(el, fp);
+            inlineRenderer.render(el, cached, id);
+          } else {
+            // Panel mode: fill cached translation into the matching slot
+            panelRenderer.renderBatch([{ id, original: getTranslatableText(el), translation: cached }]);
           }
         } else if (!el.dataset.wtDone) {
-          needs.push({ id: generateParagraphId(el), fingerprint: fp, text: getTranslatableText(el), element: el });
+          const item = { id, fingerprint: fp, text: getTranslatableText(el), element: el };
+          needs.push(item);
+          // Collect truly new paragraphs for slot appending
+          if (currentMode === 'panel') {
+            newSlots.push({ id, original: item.text, sortOrder: items.length + newSlots.length });
+          }
         }
+      }
+
+      // Panel mode: append slots for newly discovered paragraphs
+      if (currentMode === 'panel' && newSlots.length) {
+        panelRenderer.appendSlots(newSlots);
       }
       if (needs.length) onBatchReady(needs);
     };
@@ -3245,7 +3321,46 @@
   }
 
   // ------------------------------------------------------------------
-  // Resilience: offline detection & graceful shutdown
+  // Panel reopen: rebuild slots without restarting translation
+  // ------------------------------------------------------------------
+
+  /** Re-extract paragraphs and init panel slots + fill cached results.
+   *  Used when the panel is closed and reopened while translation is running. */
+  function reinitPanelSlots() {
+    const paragraphs = extractParagraphs();
+    if (!paragraphs.length) return;
+
+    const items = paragraphs.map((el) => {
+      const id = generateParagraphId(el);
+      const fp = computeFingerprint(el);
+      const text = getTranslatableText(el);
+      return { id, fingerprint: fp, text, element: el };
+    }).sort((a, b) => {
+      const pos = a.element.compareDocumentPosition(b.element);
+      return (pos & Node.DOCUMENT_POSITION_PRECEDING) ? 1 : -1;
+    });
+    items.forEach((it, i) => { it.sortOrder = i; });
+
+    // Re-init slots on the panel
+    panelRenderer.initSlots(items.map(it => ({
+      id: it.id, original: it.text, sortOrder: it.sortOrder,
+    })));
+
+    // Fill cached results immediately
+    const cachedBatch = [];
+    for (const it of items) {
+      const cached = cacheManager?.get(it.fingerprint);
+      if (cached) {
+        cachedBatch.push({ id: it.id, original: it.text, translation: cached });
+      }
+    }
+    if (cachedBatch.length) {
+      panelRenderer.renderBatch(cachedBatch);
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Resilience: offline detection, SPA routing, graceful shutdown
   // ------------------------------------------------------------------
 
   function setupResilience() {
@@ -3263,6 +3378,33 @@
         stateManager.transition(State.PAUSED);
       }
     });
+
+    // SPA route change detection.
+    // When the URL changes without a full page reload (pushState / replaceState /
+    // popstate), any active translation refers to the previous page's content.
+    // We stop translation to avoid feeding stale DOM into the panel.
+    if (window.history) {
+      const _onRouteChange = () => {
+        if (stateManager.get() !== State.IDLE) {
+          console.log('[WT] SPA route change detected — stopping translation');
+          clearTranslations();
+          stopTranslation();
+          chrome.runtime.sendMessage({ type: MSG.STOP_ALL, tabId: TAB_ID }).catch(() => {});
+        }
+      };
+
+      // Override pushState / replaceState
+      const _origPush = window.history.pushState;
+      const _origReplace = window.history.replaceState;
+      const _wrap = (orig) => function (...args) {
+        const result = orig.apply(this, args);
+        try { _onRouteChange(); } catch {}
+        return result;
+      };
+      try { window.history.pushState = _wrap(_origPush); } catch {}
+      try { window.history.replaceState = _wrap(_origReplace); } catch {}
+      window.addEventListener('popstate', _onRouteChange);
+    }
 
     // Graceful stop on page unload
     window.addEventListener('beforeunload', () => {

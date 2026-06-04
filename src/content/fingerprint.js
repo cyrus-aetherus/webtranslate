@@ -21,12 +21,13 @@ export function computeFingerprint(el) {
  * @param {Element} el
  * @param {string} fingerprint
  */
-export function markTranslated(el, fingerprint) {
+export function markTranslated(el, fingerprint, paragraphId) {
   if (fingerprint) {
     el.dataset.wtDone = fingerprint.slice(0, 12);
   } else if (!el.dataset.wtDone) {
     el.dataset.wtDone = '1';
   }
+  if (paragraphId) el.dataset.wtPgId = paragraphId;
 }
 
 /**
