@@ -22,5 +22,8 @@
     "dompurify": "^3.0.6",
     "jszip": "^3.10.1",
     "turndown": "^7.1.2"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

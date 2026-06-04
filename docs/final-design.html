@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>WebTranslate Chrome 插件 — 最终设计文档</title>
+    <style>
+        :root { --bg:#f6f8fa; --card:#fff; --text:#24292f; --muted:#57606a; --accent:#0969da; --accent2:#1a7f37; --warn:#9a6700; --danger:#cf222e; --border:#d0d7de; }
+        * { box-sizing: border-box; }
+        body { font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; background:var(--bg); color:var(--text); line-height:1.7; max-width:960px; margin:0 auto; padding:32px 24px; }
+        h1 { font-size:28px; border-bottom:2px solid var(--accent); padding-bottom:8px; margin-bottom:24px; }
+        h2 { font-size:20px; color:var(--accent); margin-top:36px; padding-bottom:6px; border-bottom:1px solid var(--border); }
+        h3 { font-size:16px; color:var(--text); margin-top:24px; }
+        .card { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:20px 24px; margin:16px 0; }
+        .tag { display:inline-block; padding:2px 10px; border-radius:12px; font-size:12px; font-weight:600; margin-right:6px; }
+        .tag.ok { background:#dafbe1; color:var(--accent2); }
+        .tag.warn { background:#fff8c5; color:var(--warn); }
+        .tag.err { background:#ffebe9; color:var(--danger); }
+        .tag.p0 { background:var(--danger); color:#fff; }
+        .tag.p1 { background:var(--warn); color:#fff; }
+        table { width:100%; border-collapse:collapse; margin:12px 0; font-size:14px; }
+        th,td { border:1px solid var(--border); padding:8px 12px; text-align:left; }
+        th { background:#f6f8fa; font-weight:600; }
+        code { background:#eaeef2; padding:2px 6px; border-radius:4px; font-family:ui-monospace,SFMono-Regular,monospace; font-size:13px; }
+        pre { background:#f6f8fa; padding:16px; border-radius:6px; overflow-x:auto; font-size:13px; }
+        ul { padding-left:22px; }
+        .flow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:10px 0; }
+        .flow-box { background:var(--card); border:1px solid var(--border); border-radius:6px; padding:8px 14px; font-size:13px; }
+        .flow-arrow { color:var(--muted); font-size:18px; }
+        .note { background:#ddf4ff; border-left:4px solid var(--accent); padding:12px 16px; border-radius:0 6px 6px 0; margin:12px 0; font-size:14px; }
+        .caution { background:#fff8c5; border-left:4px solid var(--warn); padding:12px 16px; border-radius:0 6px 6px 0; margin:12px 0; font-size:14px; }
+    </style>
+</head>
+<body>
+
+<h1>WebTranslate Chrome 插件 — 最终设计文档</h1>
+<p style="color:var(--muted); font-size:14px;">版本：v3.1 (Final) &nbsp;|&nbsp; 日期：2026-06-03 &nbsp;|&nbsp; 状态：可进入开发阶段</p>
+
+<!-- ==================== 项目定位 ==================== -->
+<div class="card">
+    <h3>📌 项目定位</h3>
+    <p>WebTranslate 是一款基于大模型 API 的 Chrome 浏览器扩展。用户在浏览任意网页时，点击右下角悬浮按钮即可按需翻译页面内容；翻译按段落分批进行，译文内联展示在原文下方；同时支持将页面打包下载为 Markdown + 图片资源。采用<strong>内联模式</strong>（译文插入原文下方）和<strong>面板模式</strong>（右侧滑出面板，原页面零修改）两种翻译方式。</p>
+</div>
+
+<!-- ==================== Manifest ==================== -->
+<h2>一、manifest.json 骨架</h2>
+<pre>{
+  "manifest_version": 3,
+  "name": "WebTranslate",
+  "version": "1.0.0",
+  "description": "基于大模型 API 的网页翻译与下载工具",
+  "permissions": ["activeTab", "storage", "downloads", "scripting", "sidePanel"],
+  "host_permissions": ["&lt;all_urls&gt;"],
+  "background": { "service_worker": "sw.js", "type": "module" },
+  "side_panel": { "default_path": "panel.html" },
+  "action": { "default_popup": "popup.html" },
+  "content_scripts": [{
+    "matches": ["http://*/*", "https://*/*"],
+    "exclude_matches": ["chrome://*/*", "chrome-extension://*/*"],
+    "js": ["content.js"],
+    "css": ["content.css"],
+    "run_at": "document_end",
+    "all_frames": false
+  }],
+  "web_accessible_resources": [{
+    "resources": ["assets/*"],
+    "matches": ["&lt;all_urls&gt;"]
+  }]
+}</pre>
+<div class="note">
+    • <code>sidePanel</code> 提供面板模式；若浏览器不支持则回退到 popup 或内联模式。<br>
+    • <code>action.default_popup</code> 作为无网页时的配置入口 + 全局翻译控制。<br>
+    • <code>run_at: "document_end"</code> 保证 DOM 构建完成后再注入，配合 IntersectionObserver 覆盖 SPA 动态内容。
+</div>
+
+<!-- ==================== 架构总览 ==================== -->
+<h2>二、整体架构</h2>
+
+<h3>2.1 组件职责</h3>
+<table>
+    <tr><th>层次</th><th>组件</th><th>职责</th><th>运行环境</th></tr>
+    <tr>
+        <td rowspan="4"><strong>Content Script</strong></td>
+        <td><strong>BatchCollector</strong></td>
+        <td>IntersectionObserver 监听视口段落；debounce 组批</td>
+        <td rowspan="4">页面沙箱</td>
+    </tr>
+    <tr><td><strong>StateManager</strong></td>
+        <td>队列调度、并发控制（默认 3 批）、AbortController map、状态机主控</td>
+    </tr>
+    <tr><td><strong>CacheManager</strong></td>
+        <td>内存 Map 缓存 + 定时批量刷入 <code>chrome.storage.session</code></td>
+    </tr>
+    <tr><td><strong>Renderer</strong></td>
+        <td>InlineRenderer（Shadow DOM 注入）或 PanelRenderer（Port 推送）</td>
+    </tr>
+    <tr>
+        <td rowspan="3"><strong>Service Worker</strong></td>
+        <td><strong>APIProxy</strong></td>
+        <td>代理批量 API 请求，Adapter 模式，重试退避</td>
+        <td rowspan="3">后台独立进程（约 30s 空闲后回收）</td>
+    </tr>
+    <tr><td><strong>DownloadManager</strong></td>
+        <td>fetch 图片、JSZip 打包、Data URL 触发下载</td>
+    </tr>
+    <tr><td><strong>ConfigStore</strong></td>
+        <td>读写 <code>chrome.storage.local</code></td>
+    </tr>
+    <tr>
+        <td rowspan="2"><strong>Storage</strong></td>
+        <td><strong>chrome.storage.local</strong></td>
+        <td>用户配置（API URL、Key、模型、并发数等）</td>
+        <td rowspan="2">浏览器持久层</td>
+    </tr>
+    <tr><td><strong>chrome.storage.session</strong></td>
+        <td>翻译缓存、折叠状态（重启清空，隐私安全）</td>
+    </tr>
+</table>
+
+<div class="caution">
+    <strong>⚠ MV3 Service Worker 非持久化约束：</strong><br>
+    • <code>AbortController</code> 不可跨 Worker 唤醒存活 → 取消信号由 CS 端 AbortController map 维护。<br>
+    • 状态机主控逻辑<strong>完全放在 Content Script 端</strong> —— CS 随页面生命周期存在，不会被后台回收。<br>
+    • Worker 端不维护跨请求的有状态上下文，每个批次的处理是无状态的。
+</div>
+
+<h3>2.2 tabId 管理</h3>
+<p>Content Script 启动时一次性获取 tabId 并缓存，所有向 SW 的消息均携带；SW 反向推送（进度、下载完成等）通过 <code>chrome.tabs.sendMessage(tabId, ...)</code>。</p>
+<pre>const { id: TAB_ID } = await chrome.tabs.getCurrent();</pre>
+
+<!-- ==================== 两种翻译模式 ==================== -->
+<h2>三、两种翻译模式</h2>
+
+<table>
+    <tr><th>维度</th><th>内联模式</th><th>面板模式</th></tr>
+    <tr><td>原页面 DOM</td><td>有修改（原文下方注入 Shadow DOM）</td><td><strong>完全不修改原页面</strong></td></tr>
+    <tr><td>适用场景</td><td>对照阅读、技术文档精读</td><td>快速浏览大意、不想"污染"原页面</td></tr>
+    <tr><td>API</td><td>Shadow DOM 注入</td><td><code>chrome.sidePanel</code>（MV3 原生）</td></tr>
+    <tr><td>消息通道</td><td><code>chrome.runtime.sendMessage</code></td><td><code>chrome.runtime.connect</code> 长连接 Port</td></tr>
+</table>
+
+<div class="note">
+    <strong>面板模式兼容性回退：</strong><br>
+    调用 <code>chrome.sidePanel</code> 前先检测 <code>if (chrome.sidePanel)</code>；不支持的浏览器回退到 <code>chrome.action.openPopup()</code> 或内联模式提示。
+</div>
+
+<!-- ==================== 核心机制 ==================== -->
+<h2>四、核心机制：视口优先 + 批量合并</h2>
+
+<h3>4.1 视口优先懒加载</h3>
+<p>不再一次性扫描全文，改用 <strong>IntersectionObserver + 视口优先级</strong>：</p>
+<pre>const observer = new IntersectionObserver((entries) => {
+  const needs = entries
+    .filter(e => e.isIntersecting && !e.target.dataset.wtDone)
+    .map(e => e.target);
+  if (needs.length) batchQueue.push(...needs);
+}, { rootMargin: "0px 0px 100% 0px" });</pre>
+<ul>
+    <li><strong>第一优先</strong>：当前视口内段落 —— 立即进入批量队列</li>
+    <li><strong>第二优先</strong>：视口下方 1 屏 —— rootMargin 预加载</li>
+    <li><strong>其余内容</strong> —— 用户滚到时 Observer 按需触发</li>
+</ul>
+
+<div class="note">
+    <strong>SPA 动态内容：</strong>MutationObserver（debounce 500ms）监听新元素 → 自动注册到 IntersectionObserver。L1 DOM 标记 + L2 内容指纹双重去重。
+</div>
+
+<h3>4.2 批量合并请求</h3>
+<p>多段合并为单次 API 调用，用唯一分隔符拆分响应，解决 N+1 问题。</p>
+
+<table>
+    <tr><th>规则</th><th>默认值</th><th>说明</th></tr>
+    <tr><td>单批总字符数上限</td><td>≤ 800（可配置）</td><td>控制 token 消耗和响应时间</td></tr>
+    <tr><td>单批段落数上限</td><td>≤ 8</td><td>防止分隔符解析复杂度过高</td></tr>
+    <tr><td>单段超长处理</td><td>≥ 800 字符 → 单独成批</td><td>长段整体送模型不切分，模型处理长文质量优于人工切碎</td></tr>
+    <tr><td>收集窗口</td><td>debounce 100ms</td><td>等 IntersectionObserver 批量 fire 完再组批</td></tr>
+</table>
+
+<p><strong>分隔符协议：</strong></p>
+<pre>───SEP:a1b2c3───
+第一段原文
+───SEP:d4e5f6───
+第二段原文
+───SEP:END───</pre>
+
+<p><strong>响应解析 + 段数校验：</strong></p>
+<pre>function parseBatchResponse(raw, items) {
+  const parts = raw.split(/───SEP:([a-z0-9]+)───/);
+  // 段数校验：返回的分隔符数必须等于请求段数
+  const segmentCount = (parts.length - 1) / 2;
+  if (segmentCount !== items.length) {
+    throw new Error(`Segment mismatch: expected ${items.length}, got ${segmentCount}`);
+  }
+  const map = {};
+  for (let i = 1; i < parts.length - 1; i += 2) {
+    map[parts[i]] = parts[i + 1].trim();
+  }
+  return items.map(item => ({
+    id: item.id,
+    translation: map[item.fingerprint] ?? item.text
+  }));
+}</pre>
+
+<div class="caution">
+    <strong>⚠ 分隔符唯一性与安全：</strong><br>
+    • 分隔符 ID 采用内容 <strong>djb2 轻量哈希</strong>（前 12 位 hex）+ 随机 2 位，计算性能优于 SHA-256，碰撞概率对 500 条量级缓存可忽略。<br>
+    • 如果原文包含 <code>───SEP:</code> 类似文本，构建请求时做 HTML 实体转义，响应解析前还原。<br>
+    • 解析时<strong>顺序配对</strong>：按分隔符出现顺序与请求段落顺序一一对应，即使模型在译文中意外生成类似分隔符，影响也仅限于该批次尾部。
+</div>
+
+<!-- ==================== 用户旅程 ==================== -->
+<h2>五、用户旅程</h2>
+
+<h3>5.1 首次安装与配置（正常流程）</h3>
+<div class="flow">
+    <span class="flow-box">安装插件</span><span class="flow-arrow">→</span>
+    <span class="flow-box">右下角出现 🌐 悬浮按钮</span><span class="flow-arrow">→</span>
+    <span class="flow-box">点击 ⚙️ 设置</span><span class="flow-arrow">→</span>
+    <span class="flow-box">填写 API URL、模型名、API Key</span><span class="flow-arrow">→</span>
+    <span class="flow-box">选择默认模式：内联 / 面板</span><span class="flow-arrow">→</span>
+    <span class="flow-box">测试连接</span><span class="flow-arrow">→</span>
+    <span class="flow-box">保存到 chrome.storage.local</span>
+</div>
+<p>配置面板居中 Modal。API Key 为 password 类型可一键显隐。即时校验 + 测试连接按钮（发送单字 "hello" 验证 Key），结果以绿/红标签实时反馈。HTTP 地址保存时弹安全警告需二次确认。</p>
+
+<h3>5.2 翻译主流程（正常流程）</h3>
+<div class="flow">
+    <span class="flow-box">用户点击 🌐 翻译</span><span class="flow-arrow">→</span>
+    <span class="flow-box">BatchCollector：IntersectionObserver 监听视口段落</span><span class="flow-arrow">→</span>
+    <span class="flow-box">debounce 100ms → 组批（≤800字, ≤8段）</span><span class="flow-arrow">→</span>
+    <span class="flow-box">查内存缓存 → 命中跳过</span><span class="flow-arrow">→</span>
+    <span class="flow-box">发送 TRANSLATE_BATCH 到 SW</span><span class="flow-arrow">→</span>
+    <span class="flow-box">SW 代理调用大模型 API</span><span class="flow-arrow">→</span>
+    <span class="flow-box">parseBatchResponse + 段数校验</span><span class="flow-arrow">→</span>
+    <span class="flow-box">Renderer 渲染（内联 Shadow DOM / 面板 Port 推送）</span>
+</div>
+
+<h3>5.3 段落提取策略</h3>
+<ul>
+    <li><strong>目标区域</strong>：优先 <code>&lt;article&gt;</code>、<code>&lt;main&gt;</code>；回退 <code>.content</code>、<code>.post</code>；最终回退 <code>document.body</code>。</li>
+    <li><strong>翻译单元</strong>：<code>&lt;p&gt;</code>、<code>&lt;h1&gt;-&lt;h6&gt;</code>、<code>&lt;li&gt;</code>、<code>&lt;td&gt;/&lt;th&gt;</code>、<code>&lt;blockquote&gt;</code>。</li>
+    <li><strong>排除区域</strong>：<code>&lt;nav&gt;</code>、<code>&lt;header&gt;</code>、<code>&lt;footer&gt;</code>、<code>&lt;aside&gt;</code>、<code>[role="complementary"]</code>、广告容器。</li>
+    <li><strong>保护内容（不翻译）</strong>：<code>&lt;pre&gt;&lt;code&gt;</code>、行内 <code>&lt;code&gt;</code>、<code>&lt;math&gt;</code>、<code>$$...$$</code>、图片/视频/音频、纯 URL、短数字/时间戳。</li>
+</ul>
+
+<h3>5.4 段落去重</h3>
+<table>
+    <tr><th>层级</th><th>机制</th><th>说明</th></tr>
+    <tr><td>L1：DOM 标记</td><td>已翻译元素设 <code>data-wt-done="djb2前12位"</code></td><td>IntersectionObserver 回调 O(1) 跳过</td></tr>
+    <tr><td>L2：内容指纹</td><td>段落文本 djb2 哈希前 12 位 hex，存入内存 Map + chrome.storage.session</td><td>SPA 元素重建后仍可命中；兜底保护</td></tr>
+</table>
+
+<h3>5.5 译文展示</h3>
+<h4>内联模式</h4>
+<pre>&lt;wt-translation data-wt-id="p_1"&gt;
+  #shadow-root
+    &lt;div class="wt-block"&gt;
+      &lt;div class="wt-header"&gt;
+        &lt;span class="wt-badge"&gt;🌐 译文&lt;/span&gt;
+        &lt;button class="wt-toggle"&gt;折叠&lt;/button&gt;
+      &lt;/div&gt;
+      &lt;div class="wt-body"&gt;...翻译结果（经 DOMPurify 净化）...&lt;/div&gt;
+    &lt;/div&gt;
+&lt;/wt-translation&gt;</pre>
+<p>浅色背景 + 左侧蓝色边框。每块独立折叠/展开，折叠状态写入 chrome.storage.session，页面刷新后恢复。</p>
+
+<h4>面板模式</h4>
+<p>panel.html 独立页面渲染双栏（原文 / 译文）或单栏纯译文列表。通过 <code>chrome.runtime.connect</code> 长连接 Port 接收 CS 推送。</p>
+
+<h3>5.6 下载页面资源（正常流程）</h3>
+<div class="flow">
+    <span class="flow-box">用户点击 ⬇️ 下载</span><span class="flow-arrow">→</span>
+    <span class="flow-box">CS 生成 Markdown（引入 turndown.js）</span><span class="flow-arrow">→</span>
+    <span class="flow-box">收集图片 URL 列表</span><span class="flow-arrow">→</span>
+    <span class="flow-box">发送 {markdown, imageUrls} 到 SW</span><span class="flow-arrow">→</span>
+    <span class="flow-box">SW 逐张 fetch 图片 → JSZip 打包</span><span class="flow-arrow">→</span>
+    <span class="flow-box">Data URL → chrome.downloads.download</span>
+</div>
+
+<div class="note">
+    <strong>Data URL 方案：</strong><br>
+    <code>zip.generateAsync({ type: "base64" })</code> → <code>data:application/zip;base64,...</code> → <code>chrome.downloads.download({ url })</code>。无需 revokeObjectURL，无 Blob URL GC 竞态风险。
+</div>
+
+<p>产物结构：</p>
+<pre>{page_title}.zip
+├── {page_title}.md        ← Markdown（优先取译文，图片链接替换为相对路径）
+├── images/
+│   ├── image_001.png
+│   └── ...
+└── metadata.json          ← { source_url, download_time, model, paragraph_count, image_count }</pre>
+
+<h3>5.7 下载进度反馈</h3>
+<p>FAB 叠加 SVG 环形进度条：</p>
+<ul>
+    <li><strong>阶段一</strong>：「正在下载图片 8/15」—— SW 每完成一张 fetch，通过 <code>chrome.tabs.sendMessage(tabId, { type:"PROGRESS", stage:"images", current, total })</code> 推送</li>
+    <li><strong>阶段二</strong>：「打包中...」—— 环形进度动效循环</li>
+    <li><strong>完成</strong>：✅ 2 秒后自动淡出</li>
+</ul>
+<div class="caution">
+    <strong>进度消息防错位：</strong>CS 收到 PROGRESS 消息时校验 <code>downloadId</code> 或 <code>timestamp</code>，与当前任务不匹配则忽略（防止页面刷新后新 CS 实例收到旧任务消息）。
+</div>
+
+<!-- ==================== 翻译 Prompt ==================== -->
+<h2>六、翻译 Prompt 与模型调用</h2>
+
+<h3>6.1 系统提示词（批量版）</h3>
+<pre>You are a professional translator. Translate the content between each
+───SEP:xxx─── marker from {sourceLang} to {targetLang}.
+
+Rules:
+1. Keep each translated section between its original SEP markers.
+2. End your response with ───SEP:END───.
+3. Do NOT translate: code blocks, URLs, numbers, proper nouns.
+4. Output ONLY the translations with separators. No explanations.</pre>
+
+<h3>6.2 调用参数</h3>
+<table>
+    <tr><th>参数</th><th>默认值</th><th>说明</th></tr>
+    <tr><td><code>temperature</code></td><td>0.1</td><td>低温度保证翻译稳定一致</td></tr>
+    <tr><td><code>max_tokens</code></td><td>批量总字符数 × 3</td><td>动态计算，最小 256</td></tr>
+    <tr><td><code>stream</code></td><td>false</td><td>非流式降低复杂度；未来可升级流式</td></tr>
+</table>
+
+<h3>6.3 Adapter 模式</h3>
+<pre>interface ModelAdapter {
+  buildRequest(batchText: string, config: Config): { url: string; headers: HeadersInit; body: string };
+  parseResponse(raw: any): string;
+}</pre>
+<p>内置适配器：OpenAI-compatible（GPT、DeepSeek、通义千问等）、Anthropic Messages API。</p>
+
+<!-- ==================== 消息协议 ==================== -->
+<h2>七、完整消息协议</h2>
+
+<h3>7.1 CS → SW</h3>
+<pre>// 批量翻译
+{ type: "TRANSLATE_BATCH", tabId, batchId, items: [{ id, fingerprint, text }], config }
+
+// 取消单个批次
+{ type: "CANCEL_BATCH", tabId, batchId }
+
+// 停止全部翻译
+{ type: "STOP_ALL", tabId }
+
+// 触发下载
+{ type: "DOWNLOAD", tabId, pageTitle, markdown, imageUrls }
+
+// 打开面板
+{ type: "OPEN_PANEL", tabId }</pre>
+
+<h3>7.2 SW → CS</h3>
+<pre>// 批量结果
+{ type: "TRANSLATE_BATCH_RESULT", batchId, results: [{ id, translation, cached }] }
+
+// 下载进度（反向推送）
+chrome.tabs.sendMessage(tabId, {
+  type: "DOWNLOAD_PROGRESS", stage: "images" | "packing" | "done", current, total
+});</pre>
+
+<h3>7.3 面板模式长连接</h3>
+<pre>const port = chrome.runtime.connect({ name: `wt-panel-${TAB_ID}` });
+
+// CS → Panel
+port.postMessage({ type: "BATCH_RESULT", items: [{ id, original, translation }] });
+
+// Panel → CS
+port.postMessage({ type: "SCROLL_TO", paragraphId: "p_5" });</pre>
+
+<!-- ==================== 状态机 ==================== -->
+<h2>八、翻译状态机</h2>
+
+<div class="card">
+<pre>IDLE
+  │  用户点击翻译
+  ▼
+SCANNING ── IntersectionObserver 开始监听视口
+  │  首批段落进入视口
+  ▼
+TRANSLATING
+  │  BatchCollector debounce 100ms 持续组批
+  │  ConcurrencyController 控制并发（默认 3 批同时进行）
+  │  每批完成 → Renderer 立即渲染
+  │
+  ├── 用户点 ⏸ ──→ PAUSED ──→ 用户点继续 ──→ TRANSLATING
+  ├── 断路器（5 批连续失败）──→ PAUSED（带错误提示 + 重试按钮）
+  ├── 401 / 403 ──→ ERROR（全停，FAB 变红，弹出设置面板）
+  ├── 429 限流 ──→ 降低并发 + 退避重试（最多 3 次）
+  └── 全部完成 ──→ IDLE（FAB 显示 ✅，2s 后恢复可点击）
+
+所有状态转换由 Content Script 端 StateManager 主控。</pre>
+</div>
+
+<h3>8.1 FAB 状态对应</h3>
+<table>
+    <tr><th>状态机状态</th><th>FAB 图标</th><th>交互</th></tr>
+    <tr><td>IDLE</td><td>🌐</td><td>点击弹出模式选择（内联 / 面板）</td></tr>
+    <tr><td>SCANNING</td><td>🔍</td><td>扫描中，短暂闪烁</td></tr>
+    <tr><td>TRANSLATING</td><td>🔄 旋转 + "12/45"</td><td>点击 → 暂停</td></tr>
+    <tr><td>PAUSED</td><td>⏸️</td><td>点击 → 继续</td></tr>
+    <tr><td>ERROR</td><td>🔴</td><td>点击 → 弹出错误详情</td></tr>
+</table>
+
+<!-- ==================== 缓存与存储 ==================== -->
+<h2>九、缓存与存储</h2>
+
+<div class="card">
+<pre>┌── 内存层（最快，进程内）───────────────┐
+│  Map&lt;fingerprint, translation&gt;          │  写入：立即
+│  命中率最高的热数据                      │  读取：O(1)
+└─────────────────────────────────────────┘
+        │ 定时刷（每 5 秒 或 每 20 条）
+        ▼
+┌── chrome.storage.session（中间层）─────┐
+│  crash recovery + 跨 SW 唤醒            │
+│  Key: wt_cache_{tabId}                 │
+│  上限：每 tab 最多 500 条 LRU 淘汰       │
+└────────────────────────────────────────┘
+
+chrome.storage.local：仅存用户配置（不存翻译内容）</pre>
+</div>
+
+<div class="note">
+    <strong>为什么不用 IndexedDB？</strong><br>
+    IndexedDB 在 MV3 中由<strong>网页 origin</strong> 隔离 —— Content Script 运行在宿主页面 origin，存在数据泄露和命名冲突风险。<code>chrome.storage.session</code> 在扩展 origin 下安全隔离，且浏览器重启后自动清空，符合翻译缓存的隐私期望。
+</div>
+
+<!-- ==================== 异常流程 ==================== -->
+<h2>十、异常流程与容错设计</h2>
+
+<h3>10.1 API 层异常</h3>
+<table>
+    <tr><th>异常场景</th><th>检测方式</th><th>处理策略</th></tr>
+    <tr>
+        <td><span class="tag err">超时</span> 模型响应超过 30 秒</td>
+        <td>CS 端 AbortController 定时器</td>
+        <td>该批次标记失败，各段显示 ❌ 重试按钮；队列继续处理其他批次。CS 发送 CANCEL_BATCH 给 SW。</td>
+    </tr>
+    <tr>
+        <td><span class="tag err">API Key 无效 / 余额不足</span></td>
+        <td>HTTP 401 / 403</td>
+        <td>全停，FAB → 🔴，弹出错误详情 + 设置面板入口。</td>
+    </tr>
+    <tr>
+        <td><span class="tag warn">限流 429</span></td>
+        <td>HTTP 429 + Retry-After 头</td>
+        <td>降低并发 + 指数退避（2^n 秒）；最多重试 3 次。</td>
+    </tr>
+    <tr>
+        <td><span class="tag err">返回空 / 格式错乱 / 段数不匹配</span></td>
+        <td>parseBatchResponse 校验</td>
+        <td>整批视为失败（段数不匹配时），各段 fallback 原文显示，记录日志。</td>
+    </tr>
+    <tr>
+        <td><span class="tag err">CORS 拦截</span></td>
+        <td>fetch 异常</td>
+        <td>由 Service Worker 代理请求，Content Script 不直接发请求，从根本上规避。</td>
+    </tr>
+</table>
+
+<h3>10.2 网络层异常</h3>
+<table>
+    <tr><th>异常场景</th><th>处理策略</th></tr>
+    <tr>
+        <td>网络中断（离线）</td>
+        <td>监听 navigator.onLine + online/offline 事件；暂停队列，FAB → 🌐⚠️；恢复后自动继续。</td>
+    </tr>
+    <tr>
+        <td>DNS 失败 / 不可达</td>
+        <td>2 次重试（1s → 3s），仍失败则标记该批失败，不影响其他批次。</td>
+    </tr>
+</table>
+
+<h3>10.3 页面层异常</h3>
+<table>
+    <tr><th>异常场景</th><th>处理策略</th></tr>
+    <tr>
+        <td>SPA 动态内容</td>
+        <td>MutationObserver（debounce 500ms）+ IntersectionObserver 双重覆盖；L1 DOM 标记 + L2 内容指纹去重。</td>
+    </tr>
+    <tr>
+        <td>页面无内容区</td>
+        <td>回退到 document.body；仍无 → Toast "未检测到可翻译内容"。</td>
+    </tr>
+    <tr>
+        <td>宿主 CSS 污染</td>
+        <td>Shadow DOM + CSS Reset；关键样式全部内联定义。</td>
+    </tr>
+    <tr>
+        <td>页面卸载</td>
+        <td>beforeunload → 优雅停止 + 缓存刷入 storage.session；下次访问相同 URL 秒级恢复。</td>
+    </tr>
+    <tr>
+        <td>原文动态修改</td>
+        <td>已翻译段落挂 MutationObserver → 标记 ⚠️ 过期 → 用户可点击刷新。</td>
+    </tr>
+    <tr>
+        <td>扩展更新（热更新）</td>
+        <td>CS 初始化时检查 data-wt-done 标记，发现已有标记则跳过，避免重复翻译。</td>
+    </tr>
+</table>
+
+<h3>10.4 用户操作异常</h3>
+<table>
+    <tr><th>异常场景</th><th>处理策略</th></tr>
+    <tr>
+        <td>连续快速点击翻译</td>
+        <td>防抖 500ms；状态机确保单一翻译会话。</td>
+    </tr>
+    <tr>
+        <td>中途停止翻译</td>
+        <td>CS 端全局取消标记 + AbortController map 全部 abort；SW 收到 STOP_ALL 忽略后续请求。已完成保留，未完成保持原文。</td>
+    </tr>
+    <tr>
+        <td>未配置 API</td>
+        <td>预检查配置完整性（URL + Key + model 三者齐全），缺失则打开设置面板并高亮必填项。</td>
+    </tr>
+</table>
+
+<h3>10.5 存储层异常</h3>
+<table>
+    <tr><th>异常场景</th><th>处理策略</th></tr>
+    <tr>
+        <td>chrome.storage.local 写入失败</td>
+        <td>降级到 chrome.storage.session，Toast 提示用户。</td>
+    </tr>
+    <tr>
+        <td>storage.session 超 10MB</td>
+        <td>每 tab 缓存上限 500 条，LRU 淘汰。</td>
+    </tr>
+    <tr>
+        <td>QUOTA_BYTES 超限</td>
+        <td>捕获 chrome.runtime.lastError，提示用户清理。</td>
+    </tr>
+</table>
+
+<!-- ==================== 健壮性机制 ==================== -->
+<h2>十一、核心健壮性机制</h2>
+
+<h3>11.1 重试与断路器</h3>
+<ul>
+    <li>单批失败 → 自动重试 2 次，退避 1s → 3s。</li>
+    <li>429 限流 → 读取 Retry-After 头，或 2^n 秒退避（2s → 4s → 8s）。</li>
+    <li>连续 5 批失败 → <strong>断路器触发</strong>，自动暂停，FAB → ⏸️，弹出提示。</li>
+</ul>
+
+<h3>11.2 事务性保证</h3>
+<p>每个段落的翻译是独立原子操作。成功 → 插入译文（DOMPurify 净化后）；失败 → 保持原文。净化白名单仅允许 <code>&lt;b&gt;&lt;i&gt;&lt;em&gt;&lt;strong&gt;&lt;code&gt;&lt;pre&gt;&lt;br&gt;&lt;span&gt;</code>，移除 script、on* 事件、javascript: URL。</p>
+
+<h3>11.3 输入校验</h3>
+<table>
+    <tr><th>字段</th><th>校验规则</th></tr>
+    <tr><td>API URL</td><td>正则 <code>/^https?:\/\/[\w\-]+(\.[\w\-]+)+.*$/</code>；HTTP 给出安全警告需二次确认</td></tr>
+    <tr><td>API Key</td><td>非空，长度 ≥ 8</td></tr>
+    <tr><td>模型名</td><td>非空，长度 ≤ 100</td></tr>
+    <tr><td>并发批数</td><td>整数 1–10</td></tr>
+    <tr><td>单批字符上限</td><td>整数 500–5000</td></tr>
+</table>
+
+<h3>11.4 资源清理</h3>
+<ul>
+    <li>翻译停止/完成 → CS 端释放所有 AbortController、定时器、IntersectionObserver、MutationObserver。</li>
+    <li>插件卸载（chrome.runtime.onSuspend）→ SW 清理进行中的 fetch。</li>
+    <li>下载完成 → Data URL 无需手动 revoke；图片 Blob 在打包后立即释放。</li>
+    <li>FAB 拖拽事件 + Port 连接在页面卸载时移除。</li>
+</ul>
+
+<!-- ==================== 数据流时序 ==================== -->
+<h2>十二、关键数据流时序</h2>
+
+<h3>12.1 批量翻译完整时序</h3>
+<pre>Content Script                              Service Worker                  大模型 API
+      │                                            │                              │
+      │  1. IntersectionObserver fire              │                              │
+      │  2. debounce 100ms → 组批                  │                              │
+      │  3. checkCache(fingerprints)               │                              │
+      │     命中 → 直接渲染，未命中 → 下一轮        │                              │
+      │  4. sendMessage({                           │                              │
+      │       type:"TRANSLATE_BATCH",               │                              │
+      │       tabId, batchId, items[], config       │                              │
+      │     })                                      │                              │
+      │ ──────────────────────────────────────────▶│                              │
+      │                                            │  5. buildBatchRequest()      │
+      │                                            │  6. fetch(api_url, {...})    │
+      │                                            │ ────────────────────────────▶│
+      │                                            │  7. response JSON            │
+      │                                            │ ◀────────────────────────────│
+      │                                            │  8. parseBatchResponse()     │
+      │  9. sendResponse({                          │                              │
+      │       type:"TRANSLATE_BATCH_RESULT",        │                              │
+      │       batchId, results[]                    │                              │
+      │     })                                      │                              │
+      │ ◀──────────────────────────────────────────│                              │
+      │ 10. DOMPurify + 段数校验                     │                              │
+      │ 11. renderBatch(results)                    │                              │
+      │     (内联: insertTranslation / 面板: port.postMessage)                   │
+      │ 12. writeCache(fingerprints → translations) │                              │
+
+      —— 取消场景 ——
+      CS 端 abort(batchId) → 移除对应 AbortController
+      SW 端收到 CANCEL_BATCH → 忽略该 batchId 的 API 响应，不 sendResponse</pre>
+
+<h3>12.2 下载完整时序</h3>
+<pre>Content Script                              Service Worker
+      │                                            │
+      │  1. generateMarkdown() (turndown.js)        │
+      │  2. collectImageUrls()                      │
+      │  3. sendMessage({                           │
+      │       type:"DOWNLOAD",                      │
+      │       tabId, pageTitle, markdown, imageUrls │
+      │     })                                      │
+      │ ──────────────────────────────────────────▶│
+      │                                            │  4. for each imageUrl:
+      │  ←── chrome.tabs.sendMessage(tabId,        │       fetch → Blob (no-cors 降级)
+      │       { PROGRESS: "images", 8/15 }) ───────│       → sendMessage(PROGRESS)
+      │                                            │  5. JSZip.pack(md + images)
+      │  ←── { PROGRESS: "packing" } ──────────────│  6. zipBase64 = zip.generateAsync({type:"base64"})
+      │                                            │  7. chrome.downloads.download({
+      │                                            │       url: "data:application/zip;base64,...",
+      │                                            │       filename, saveAs: false
+      │                                            │     })
+      │  ←── { DOWNLOAD_COMPLETE } ────────────────│
+      │                                            │  (无需 revokeObjectURL)</pre>
+
+<!-- ==================== 安全与隐私 ==================== -->
+<h2>十三、安全与隐私设计</h2>
+
+<table>
+    <tr><th>关注点</th><th>设计策略</th></tr>
+    <tr>
+        <td>API Key 存储</td>
+        <td>chrome.storage.local（仅本地）；未来可选升级为 storage.session（重启清空，更安全）。</td>
+    </tr>
+    <tr>
+        <td>数据传输</td>
+        <td>强制 HTTPS；HTTP 地址保存时弹窗警告需二次确认。</td>
+    </tr>
+    <tr>
+        <td>XSS 防护</td>
+        <td>DOMPurify 白名单净化 + Shadow DOM 样式隔离双层防护。</td>
+    </tr>
+    <tr>
+        <td>权限最小化</td>
+        <td>activeTab + storage + downloads + scripting + sidePanel；不读浏览历史、cookies。</td>
+    </tr>
+    <tr>
+        <td>用户告知</td>
+        <td>设置面板底部固定隐私声明 + API 地址可信提示。</td>
+    </tr>
+    <tr>
+        <td>缓存安全</td>
+        <td>chrome.storage.session 浏览器重启自动清空；不持久化原文/译文到磁盘。</td>
+    </tr>
+</table>
+
+<!-- ==================== FAB 设计 ==================== -->
+<h2>十四、悬浮按钮（FAB）交互设计</h2>
+
+<h3>14.1 位置管理</h3>
+<ul>
+    <li><strong>默认</strong>：右下角，距边缘 20px，z-index: 2147483647。</li>
+    <li><strong>长按拖拽</strong>：长按 300ms 进入拖拽模式，释放后位置存入 chrome.storage.local，跨页面复用。</li>
+    <li><strong>边界约束</strong>：限制在 viewport 内，至少 10px 安全边距。</li>
+    <li><strong>全屏避让</strong>：检测 document.fullscreenElement → 半透明 + 缩小。</li>
+</ul>
+
+<h3>14.2 FAB 菜单</h3>
+<pre>点击 FAB（长按拖拽）→ 弹出扇形菜单：
+  🌐 开始翻译（内联模式）
+  📋 开始翻译（面板模式）
+  ⬇️ 下载页面
+  ⚙️ 设置
+  ❌ 关闭（仅在翻译进行中显示）</pre>
+
+<!-- ==================== 扩展性 ==================== -->
+<h2>十五、扩展性预留</h2>
+
+<ul>
+    <li><strong>多语言</strong>：设置面板预留语言选择器，Prompt 按 {sourceLang}/{targetLang} 动态生成。</li>
+    <li><strong>多模型</strong>：Adapter 模式 —— buildRequest() + parseResponse()；内置 OpenAI-compatible 和 Anthropic 适配器。</li>
+    <li><strong>主题</strong>：Shadow DOM 内 CSS 变量，未来跟随 prefers-color-scheme 自动 dark/light。</li>
+    <li><strong>配置导入/导出</strong>：JSON 导出/导入（不含 API Key）。</li>
+    <li><strong>划词翻译</strong>：mouseup → 旁出按钮 → 复用 Adapter + SW 代理管道。</li>
+    <li><strong>流式翻译</strong>：stream: true 参数位预留；SW 通过 ReadableStream 逐 chunk → Port 推送。</li>
+</ul>
+
+<!-- ==================== 测试策略 ==================== -->
+<h2>十六、测试策略</h2>
+
+<table>
+    <tr><th>层级</th><th>范围</th><th>工具</th><th>关键用例</th></tr>
+    <tr>
+        <td><strong>单元测试</strong></td>
+        <td>段落提取、指纹计算、Markdown 生成、配置校验、Adapter parseResponse、parseBatchResponse（含段数校验）</td>
+        <td>Vitest / Jest</td>
+        <td>• 空页面 → 段落提取返回空 <br>• code/pre/math 段落 → 保护 <br>• 分隔符解析 + 段数校验正确性 <br>• 非法 URL → 配置校验拒绝 <br>• 模型返回缺少分隔符 → fallback 原文</td>
+    </tr>
+    <tr>
+        <td><strong>集成测试</strong></td>
+        <td>CS ↔ SW 消息通信、缓存读写、IntersectionObserver + BatchCollector</td>
+        <td>Chrome Extension Testing Framework</td>
+        <td>• TRANSLATE_BATCH → 收到正确批量结果 <br>• 缓存命中跳过 API 请求 <br>• CANCEL_BATCH → 对应批被忽略 <br>• 面板模式 Port 通信正常</td>
+    </tr>
+    <tr>
+        <td><strong>E2E 测试</strong></td>
+        <td>完整旅程：安装 → 配置 → 内联翻译 → 面板翻译 → 折叠 → 下载</td>
+        <td>Playwright + CDP</td>
+        <td>• 静态 HTML 翻译 <br>• SPA 动态内容 + IntersectionObserver <br>• 下载 ZIP 验证文件结构 <br>• 离线恢复在线 → 翻译继续</td>
+    </tr>
+    <tr>
+        <td><strong>混沌测试</strong></td>
+        <td>Mock API 注入：超时、429、500、畸形 JSON、分隔符缺失、段数不匹配</td>
+        <td>msw 或自定义 mock server</td>
+        <td>• 429 → 退避重试 + 并发降低 <br>• 连续 5 批失败 → 断路器 <br>• 401 → 全停 + FAB 变红 <br>• 段数不匹配 → 整批失败 + fallback</td>
+    </tr>
+</table>
+
+<!-- ==================== 版本改进对照 ==================== -->
+<h2>十七、v3.1 Final 关键改进对照</h2>
+
+<table>
+    <tr><th>问题</th><th>原设计</th><th>v3.1 Final 方案</th></tr>
+    <tr><td>N+1 请求</td><td>每段独立调用 API</td><td><strong>批量合并</strong>，分隔符拆分响应（≤800字/批, ≤8段/批）</td></tr>
+    <tr><td>全页一次扫描</td><td>启动即扫描全文</td><td><strong>视口优先</strong>，IntersectionObserver 懒触发 + rootMargin 预加载</td></tr>
+    <tr><td>tabId 缺失</td><td>未提及</td><td>CS 启动缓存 tabId；SW 通过 tabs.sendMessage 反向推送</td></tr>
+    <tr><td>Blob URL 时序</td><td>createObjectURL + download 竞态</td><td><strong>Data URL</strong>（base64），无时序问题</td></tr>
+    <tr><td>storage 高频写</td><td>每段完成即写 storage</td><td><strong>内存 Map</strong> + 定时批量刷 → storage.session</td></tr>
+    <tr><td>面板模式缺失</td><td>仅内联模式</td><td><strong>chrome.sidePanel</strong> 原生面板 + 兼容性回退</td></tr>
+    <tr><td>句子切分误判</td><td>正则切句</td><td>长段<strong>整体送模型不切分</strong></td></tr>
+    <tr><td>多 Observer 开销</td><td>每段挂一个 Observer</td><td><strong>单根 Observer</strong> + rootMargin 统一管理</td></tr>
+    <tr><td>SW 生命周期</td><td>AbortController 跨 Worker</td><td>取消信号由 <strong>CS 端 AbortController map</strong> 维护</td></tr>
+    <tr><td>IndexedDB 安全</td><td>IndexedDB（origin 共享）</td><td><strong>chrome.storage.session</strong>（扩展 origin 隔离）</td></tr>
+    <tr><td><span class="tag p0">P0</span> 段数不匹配</td><td>缺失</td><td><strong>parseBatchResponse 段数校验</strong>，不匹配则整批失败 fallback</td></tr>
+    <tr><td><span class="tag p0">P0</span> 进度消息错位</td><td>缺失</td><td>CS 收到 PROGRESS 时校验 downloadId/timestamp，不匹配则忽略</td></tr>
+    <tr><td><span class="tag p1">P1</span> 图片跨域下载</td><td>直接 fetch</td><td>增加 <strong>no-cors 降级</strong>，失败时保留原始 URL 不中断整包</td></tr>
+    <tr><td><span class="tag p1">P1</span> sidePanel 兼容性</td><td>直接调用</td><td>特性检测 <strong>chrome.sidePanel</strong>，不支持则回退 popup/内联</td></tr>
+    <tr><td><span class="tag p1">P1</span> Markdown 生成</td><td>手写转换</td><td>引入 <strong>turndown.js</strong> 处理复杂 DOM 到 Markdown 转换</td></tr>
+    <tr><td><span class="tag p1">P1</span> 缓存指纹性能</td><td>SHA-256</td><td><strong>djb2 轻量哈希</strong>，计算性能提升 10~50 倍</td></tr>
+    <tr><td><span class="tag p1">P1</span> 扩展热更新</td><td>缺失</td><td>CS 初始化时检查 data-wt-done 标记，避免重复翻译</td></tr>
+</table>
+
+<!-- ==================== 结束 ==================== -->
+<div class="card" style="margin-top:40px; text-align:center; color:var(--muted); font-size:13px;">
+    本文档为 WebTranslate Chrome 插件的完整最终设计规范（v3.1 Final）。<br>
+    涵盖双模式翻译、批量合并、视口优先加载、消息协议、状态机、异常处理、安全策略及测试方案。<br>
+    所有 P0/P1 改进项已融入正文，开发实现阶段应以本文档为唯一基准。
+</div>
+
+</body>
+</html>
