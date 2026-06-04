@@ -73,6 +73,7 @@ const HARDCODED_EN_FALLBACK = {
   'fab.clear': 'Clear',
   'fab.download': 'Download Page',
   'fab.settings': 'Settings',
+  'fab.resume': 'Resume',
   'fab.stop': 'Stop',
 
   'inline.badge': 'Translation',
