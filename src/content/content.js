@@ -137,6 +137,12 @@ async function init() {
     if (msg.type === MSG.DOWNLOAD_PROGRESS) {
       updateDownloadProgress(msg);
     }
+    if (msg.type === 'PANEL_CLOSED') {
+      if (currentMode === 'panel' && (stateManager?.get() === State.TRANSLATING || stateManager?.get() === State.SCANNING)) {
+        stopTranslation();
+      }
+      return;
+    }
     if (msg.type === 'SCROLL_TO') {
       let el = document.querySelector(`[data-wt-pg-id="${msg.paragraphId}"]`);
       if (!el) el = document.querySelector(`.wt-inline-block[data-wt-id="${msg.paragraphId}"]`);

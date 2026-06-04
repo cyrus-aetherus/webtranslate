@@ -202,7 +202,13 @@ let _panelTabId = -1;
           chrome.tabs.sendMessage(_panelTabId, msg).catch(() => {});
         }
       });
-      port.onDisconnect.addListener(() => { panelReceiver = null; });
+      port.onDisconnect.addListener(() => {
+        panelReceiver = null;
+        // Notify content script so it can transition to PAUSED
+        if (_panelTabId > 0) {
+          chrome.tabs.sendMessage(_panelTabId, { type: 'PANEL_CLOSED' }).catch(() => {});
+        }
+      });
       return;
     }
 
