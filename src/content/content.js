@@ -217,6 +217,9 @@ const _pendingBatches = new Map();
 const _pendingFingerprints = new Set();
 // Callback for sequential top-down batch processing (set by startTranslation)
 let _onBatchDone = null;
+// Panel mode: accumulated completed items (id → {id, original, translation}),
+// rebuilt into a sorted list on each batch completion and sent to the panel.
+const _panelItems = new Map();
 
 function onBatchReady(batch) {
   if (stateManager.get() === State.PAUSED) return;
@@ -291,10 +294,17 @@ function handleBatchResult(msg) {
     if (currentMode === 'inline') {
       inlineRenderer.render(original.element, r.translation, original.id);
     } else {
-      panelRenderer.renderBatch([{
-        id: original.id, original: original.text, translation: r.translation,
-      }]);
+      // Panel mode: accumulate then send sorted list to preserve paragraph order
+      _panelItems.set(r.id, { id: original.id, original: original.text, translation: r.translation });
     }
+  }
+  // Flush accumulated panel items in paragraph order so the side panel
+  // always displays translations top-to-bottom, regardless of batch completion order.
+  if (currentMode === 'panel' && _panelItems.size > 0) {
+    const sorted = [..._panelItems.values()].sort((a, b) =>
+      a.id < b.id ? -1 : a.id > b.id ? 1 : 0
+    );
+    panelRenderer.renderBatch(sorted);
   }
   // Trigger sequential batch processor
   if (_onBatchDone) { const cb = _onBatchDone; _onBatchDone = null; try { cb(); } catch {} }
@@ -312,6 +322,7 @@ function stopTranslation() {
   if (window._wtDisposeScroll) { window._wtDisposeScroll.forEach(fn => fn()); window._wtDisposeScroll = []; }
   _pendingFingerprints.clear();
   _pendingBatches.clear();
+  _panelItems.clear();
   _onBatchDone = null;
   chrome.runtime.sendMessage({ type: MSG.STOP_ALL, tabId: TAB_ID || 0 });
   chrome.storage.session.set({ wt_active: false }).catch(() => {});
@@ -337,6 +348,7 @@ function retranslate(mode) {
   // Clear pending state
   _pendingFingerprints.clear();
   _pendingBatches.clear();
+  _panelItems.clear();
   _onBatchDone = null;
   stateManager?.transition(State.IDLE);
   startTranslation(mode);
@@ -361,6 +373,7 @@ function switchMode(to) {
   if (window._wtDisposeScroll) { window._wtDisposeScroll.forEach(fn => fn()); window._wtDisposeScroll = []; }
   _pendingFingerprints.clear();
   _pendingBatches.clear();
+  _panelItems.clear();
   _onBatchDone = null;
   chrome.runtime.sendMessage({ type: MSG.STOP_ALL, tabId: TAB_ID || 0 });
 

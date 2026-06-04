@@ -55,10 +55,17 @@ function connect() {
 }
 
 function renderBatch(items) {
+  // Clear existing items and re-render the entire sorted list.
+  // Content script sends the full accumulated list each time, sorted
+  // by document order — this guarantees paragraph order is correct
+  // regardless of concurrent batch completion order.
+  listEl.querySelectorAll('.item').forEach(el => el.remove());
+
   // Remove empty placeholder if present
   const empty = listEl.querySelector('.empty');
   if (empty) empty.remove();
 
+  itemCount = 0;
   for (const it of items) {
     itemCount++;
     const div = document.createElement('div');
