@@ -1,9 +1,15 @@
 /**
  * DownloadTrigger - Generates Markdown from page content and collects image URLs,
  * then sends the payload to the Service Worker for ZIP packaging.
+ *
+ * Uses Mozilla Readability (Firefox Reader View algorithm) to extract clean
+ * article content — ads, navigation, sidebars, scripts, and other page chrome
+ * are automatically removed.  This is the same battle-tested engine that
+ * powers Reader Mode in Firefox and Safari.
  */
 
 import TurndownService from 'turndown';
+import { Readability } from '@mozilla/readability';
 
 const turndown = new TurndownService({
   headingStyle: 'atx',
@@ -12,18 +18,30 @@ const turndown = new TurndownService({
 
 /**
  * Generate Markdown from the current page content.
- * Prefer translated content where available.
+ * Uses Readability to extract clean article content, then converts to Markdown.
+ * Falls back to document.body + basic filtering if no article is found.
  * @returns {string}
  */
 export function generateMarkdown() {
-  const root = document.querySelector('article, main, .content, .post, .entry-content, [role="main"]')
-    || document.body;
+  // 1. Extract clean article content using Firefox Reader View algorithm
+  const docClone = document.cloneNode(true);
+  const article = new Readability(docClone).parse();
 
-  // Clone to avoid mutating live DOM
-  const clone = root.cloneNode(true);
+  let html;
+  if (article && article.content) {
+    // Readability found an article — use its cleaned HTML
+    html = article.content;
+  } else {
+    // Fallback: use body with basic script/style/nav removal
+    const clone = document.body.cloneNode(true);
+    clone.querySelectorAll('script, style, noscript, nav, header, footer, aside, [role="navigation"], [role="banner"], [role="contentinfo"]').forEach(el => el.remove());
+    html = clone.innerHTML;
+  }
 
-  // Replace inline translations with their text for cleaner Markdown
-  clone.querySelectorAll('.wt-inline-block').forEach((block) => {
+  // 2. Replace inline translation blocks with their text
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  tmp.querySelectorAll('.wt-inline-block').forEach((block) => {
     const body = block.querySelector('.wt-inline-body');
     if (body) {
       const span = document.createElement('span');
@@ -34,7 +52,11 @@ export function generateMarkdown() {
     }
   });
 
-  return turndown.turndown(clone.innerHTML);
+  // 3. Convert to Markdown and clean up excess whitespace
+  let md = turndown.turndown(tmp.innerHTML);
+  // Collapse 3+ consecutive blank lines into 2
+  md = md.replace(/\n{4,}/g, '\n\n\n');
+  return md.trim() + '\n';
 }
 
 /**
