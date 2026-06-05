@@ -32,7 +32,41 @@ async function bootstrap() {
     }
   });
 }
+/** Collect current panel DOM state and send it to SW for E2E diagnostics. */
+function _pushStateToSW() {
+  if (!port) return;
+  try {
+    port.postMessage({
+      type: 'PANEL_STATE',
+      state: {
+        badge: document.getElementById('badge')?.textContent || '',
+        badgeClass: document.getElementById('badge')?.className || '',
+        slots: document.querySelectorAll('.item').length,
+        pending: document.querySelectorAll('.item.pending').length,
+        error: document.querySelectorAll('.item.error').length,
+        connected: !!port,
+      },
+    });
+  } catch { /* port may be closed */ }
+}
+
 bootstrap();
+
+// E2E diagnostic — also expose on window for CDP fallback
+const _diagFn = () => ({
+  badge: document.getElementById('badge')?.textContent || '',
+  badgeClass: document.getElementById('badge')?.className || '',
+  slots: document.querySelectorAll('.item').length,
+  pending: document.querySelectorAll('.item.pending').length,
+  error: document.querySelectorAll('.item.error').length,
+  empty: document.querySelector('.empty')?.textContent || '',
+  connected: !!port,
+});
+globalThis._wtPanelDiag = _diagFn;
+self._wtPanelDiag = _diagFn;
+window._wtPanelDiag = _diagFn;
+// Push initial state after bootstrap completes
+setTimeout(_pushStateToSW, 500);
 
 async function _loadLocale() {
   try {
@@ -74,9 +108,15 @@ function connect() {
     if (msg.type === 'BATCH_RESULT')  fillSlots(msg.items);
     if (msg.type === 'SLOT_ERROR')    markSlotErrors(msg.itemIds);
     if (msg.type === 'SHOW_PLACEHOLDER') _showPlaceholder();
+    if (msg.type === 'SHOW_EMPTY')    _showEmpty();
   });
 
   port.onDisconnect.addListener(() => {
+    // Clear all slots so stale content from a previous SPA page
+    // doesn't linger when the user navigates to a new page.
+    listEl.querySelectorAll('.item').forEach(el => el.remove());
+    slotMap.clear();
+    totalSlots = 0; filledSlots = 0; erroredSlots = 0;
     badgeEl.textContent = t('panel.disconnected');
     badgeEl.className = 'disconnected';
     port = null;
@@ -103,6 +143,7 @@ function initSlots(items) {
   }
 
   _updateBadge();
+  _pushStateToSW();
 }
 
 // ---- APPEND_SLOTS (incremental — progressive-loading pages) ----
@@ -119,6 +160,7 @@ function appendSlots(items) {
   }
 
   _updateBadge();
+  _pushStateToSW();
 }
 
 // ---- BATCH_RESULT ----
@@ -151,6 +193,7 @@ function fillSlots(items) {
   }
 
   _updateBadge();
+  _pushStateToSW();
 }
 
 // ---- SLOT_ERROR ----
@@ -172,6 +215,7 @@ function markSlotErrors(itemIds) {
   }
 
   _updateBadge();
+  _pushStateToSW();
 }
 
 // ---- helpers ----
@@ -215,6 +259,16 @@ function _showPlaceholder() {
   totalSlots = 0; filledSlots = 0; erroredSlots = 0;
   badgeEl.textContent = t('panel.switch_back');
   badgeEl.className = 'waiting';
+  _pushStateToSW();
+}
+
+function _showEmpty() {
+  listEl.querySelectorAll('.item').forEach(el => el.remove());
+  slotMap.clear();
+  totalSlots = 0; filledSlots = 0; erroredSlots = 0;
+  badgeEl.textContent = t('panel.empty_hint');
+  badgeEl.className = 'waiting';
+  _pushStateToSW();
 }
 
 function escapeHtml(text) {

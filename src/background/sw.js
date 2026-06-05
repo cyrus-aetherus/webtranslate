@@ -189,6 +189,10 @@ let _panelTabId = -1;
 let _panelReceiver = null;
 /** @type {object[]} buffered messages waiting for panel to connect */
 const _panelPending = [];
+/** @type {Map<number, chrome.runtime.Port>} content script panel ports by tabId */
+const _csPorts = new Map();
+/** @type {object|null} latest panel DOM state from PANEL_STATE messages */
+let _panelState = null;
 
 // MV3: Service Worker auto-terminates after idle; restore _panelTabId
 // from session storage so tab-switch handling survives SW restarts.
@@ -205,17 +209,20 @@ chrome.storage.session?.get('_panelTabId').then(({ _panelTabId: id }) => {
         try { _panelReceiver.postMessage(msg); } catch { _panelReceiver = null; break; }
       }
       _panelPending.length = 0;
-      // Listen for messages FROM the panel (SCROLL_TO, etc.)
+      // Listen for messages FROM the panel (SCROLL_TO, PANEL_STATE, etc.)
       port.onMessage.addListener((msg) => {
         if (msg.type === 'SCROLL_TO' && _panelTabId > 0) {
           chrome.tabs.sendMessage(_panelTabId, msg).catch(() => {});
+        }
+        if (msg.type === 'PANEL_STATE') {
+          _panelState = msg.state;
         }
       });
       port.onDisconnect.addListener(() => {
         _panelReceiver = null;
         const closedTabId = _panelTabId;
-        _panelTabId = -1;
-        chrome.storage.session?.remove('_panelTabId').catch(() => {});
+        // Do NOT clear _panelTabId here — tabs.onActivated manages the active tab.
+        // This preserves panel state tracking across tab switches.
         // Notify content script so it can transition to PAUSED
         if (closedTabId > 0) {
           chrome.tabs.sendMessage(closedTabId, { type: 'PANEL_CLOSED' }).catch(() => {});
@@ -225,6 +232,11 @@ chrome.storage.session?.get('_panelTabId').then(({ _panelTabId: id }) => {
     }
 
     if (port.name === 'wt-panel-cs') {
+      const tabId = port.sender?.tab?.id ?? -1;
+      if (tabId > 0) _csPorts.set(tabId, port);
+      port.onDisconnect.addListener(() => {
+        if (tabId > 0) _csPorts.delete(tabId);
+      });
       port.onMessage.addListener((msg) => {
         if (_panelReceiver) {
           try { _panelReceiver.postMessage(msg); } catch { _panelReceiver = null; }
@@ -243,15 +255,23 @@ chrome.storage.session?.get('_panelTabId').then(({ _panelTabId: id }) => {
  * content script to rebuild the panel slots from cache.
  */
 chrome.tabs.onActivated.addListener(({ tabId }) => {
-  if (_panelTabId <= 0) return;
+  _panelTabId = tabId;
+  chrome.storage.session?.set({ _panelTabId: tabId }).catch(() => {});
 
-  if (tabId !== _panelTabId) {
-    // Switched away — clear panel content so old translations don't linger
-    if (_panelReceiver) {
-      try { _panelReceiver.postMessage({ type: 'SHOW_PLACEHOLDER' }); } catch {}
-    }
-  } else {
-    // Switched back — rebuild panel with cached translations
-    chrome.tabs.sendMessage(_panelTabId, { type: 'REINIT_PANEL_SLOTS' }).catch(() => {});
-  }
+  if (!_panelReceiver) return;
+
+  // Ask the new active tab to rebuild its panel state.
+  // If the tab has no content script (e.g. chrome:// page), show empty state.
+  chrome.tabs.sendMessage(tabId, { type: 'REINIT_PANEL_SLOTS' }).catch(() => {
+    try { _panelReceiver.postMessage({ type: 'SHOW_EMPTY' }); } catch {}
+  });
 });
+
+// E2E diagnostic — expose internal state for Playwright tests
+self._wtDiag = {
+  get panelTabId() { return _panelTabId; },
+  get hasReceiver() { return !!_panelReceiver; },
+  get pendingCount() { return _panelPending.length; },
+  get csPortsCount() { return _csPorts.size; },
+  get panelState() { return _panelState; },
+};

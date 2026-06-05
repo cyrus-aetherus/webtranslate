@@ -7,7 +7,10 @@
 import { State } from '../shared/constants.js';
 
 const VALID_TRANSITIONS = {
-  [State.IDLE]: [State.SCANNING],
+  // IDLE → PAUSED: page refresh while Panel translation was active.
+  // Panel can't auto-restart without a user gesture, so we transition
+  // directly to PAUSED to tell the user "click Resume to continue".
+  [State.IDLE]: [State.SCANNING, State.PAUSED],
   [State.SCANNING]: [State.TRANSLATING, State.IDLE, State.ERROR],
   [State.TRANSLATING]: [State.PAUSED, State.IDLE, State.ERROR],
   [State.PAUSED]: [State.TRANSLATING, State.IDLE, State.ERROR],

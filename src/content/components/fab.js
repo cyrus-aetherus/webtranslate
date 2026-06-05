@@ -224,6 +224,7 @@ export class FabComponent {
     this._open = false; this._dragging = false; this._longTimer = null;
     this._pos = { x: 0, y: 0 }; this._offset = { x: 0, y: 0 }; this._start = { x: 0, y: 0 };
     this._boundMove = this._onMove.bind(this); this._boundUp = this._onUp.bind(this);
+    this._boundResize = this._onResize.bind(this);
     this._labelEls = []; this._menuItems = null;
     this._currentState = 'IDLE'; this._currentMode = 'inline';
   }
@@ -237,8 +238,14 @@ export class FabComponent {
     document.body.appendChild(this.menuEl);
     this._loadPosition();
     this._listenLangChange();
+    window.addEventListener('resize', this._boundResize);
   }
-  dispose() { this.el?.remove(); this.menuEl?.remove(); document.getElementById(STYLE_ID)?.remove(); document.removeEventListener('mousemove', this._boundMove); document.removeEventListener('mouseup', this._boundUp); if (this._storageListener && chrome.storage?.onChanged) chrome.storage.onChanged.removeListener(this._storageListener); }
+  dispose() {
+    this.el?.remove(); this.menuEl?.remove(); document.getElementById(STYLE_ID)?.remove();
+    document.removeEventListener('mousemove', this._boundMove); document.removeEventListener('mouseup', this._boundUp);
+    window.removeEventListener('resize', this._boundResize);
+    if (this._storageListener && chrome.storage?.onChanged) chrome.storage.onChanged.removeListener(this._storageListener);
+  }
 
   /** Re-read i18n labels and update menu text. Call after i18n.init() or language change. */
   updateLabels(t) {
@@ -436,11 +443,40 @@ export class FabComponent {
   _onDown(e) { if (e.button) return; this._startDrag(e.clientX, e.clientY); document.addEventListener('mousemove', this._boundMove); document.addEventListener('mouseup', this._boundUp); }
   _onTouch(e) { if (e.touches.length !== 1) return; e.preventDefault(); this._startDrag(e.touches[0].clientX, e.touches[0].clientY); document.addEventListener('touchend', this._boundUp, { once: true }); }
   _startDrag(cx, cy) { this._dragging = false; this._start = { x: cx, y: cy }; this._offset = { x: cx - this.el.offsetLeft, y: cy - this.el.offsetTop }; this._longTimer = setTimeout(() => { this._dragging = true; }, 180); }
-  _onMove(e) { if (!this._dragging) { if (Math.hypot(e.clientX - this._start.x, e.clientY - this._start.y) < 5) return; this._dragging = true; } e.preventDefault(); this._setPos(e.clientX - this._offset.x, e.clientY - this._offset.y); }
+  _onMove(e) { if (!this._dragging) { if (Math.hypot(e.clientX - this._start.x, e.clientY - this._start.y) < 5) return; this._dragging = true; } e.preventDefault(); this._setPos(e.clientX - this._offset.x, e.clientY - this._offset.y); if (this._open) this._positionMenuItems(); }
   _onUp() { clearTimeout(this._longTimer); document.removeEventListener('mousemove', this._boundMove); document.removeEventListener('mouseup', this._boundUp); if (this._dragging) this._savePosition(); }
   _setPos(x, y) { x = Math.max(0, Math.min(x, innerWidth - SIZE)); y = Math.max(0, Math.min(y, innerHeight - SIZE)); this._pos = { x, y }; this.el.style.left = x + 'px'; this.el.style.top = y + 'px'; }
-  async _savePosition() { try { await chrome.storage.local.set({ wt_fab_pos: this._pos }); } catch {} }
-  async _loadPosition() { try { const d = await chrome.storage.local.get('wt_fab_pos'); if (d.wt_fab_pos) this._setPos(d.wt_fab_pos.x, d.wt_fab_pos.y); } catch {} }
+
+  /** When viewport changes (panel opens/closes), re-clamp the visual
+   *  position but do NOT update this._pos.  The stored _pos is the
+   *  user's desired position; when the viewport restores (panel closes),
+   *  the FAB returns to that position automatically. */
+  _onResize() {
+    const x = Math.max(0, Math.min(this._pos.x, innerWidth - SIZE));
+    const y = Math.max(0, Math.min(this._pos.y, innerHeight - SIZE));
+    this.el.style.left = x + 'px';
+    this.el.style.top = y + 'px';
+  }
+
+  /** Save position as right/bottom offsets so FAB stays visible after resize. */
+  async _savePosition() {
+    const r = innerWidth - this._pos.x - SIZE;
+    const b = innerHeight - this._pos.y - SIZE;
+    try { await chrome.storage.local.set({ wt_fab_pos: { right: r, bottom: b } }); } catch {}
+  }
+  async _loadPosition() {
+    try {
+      const d = await chrome.storage.local.get('wt_fab_pos');
+      if (d.wt_fab_pos) {
+        // Support both old format {x,y} and new format {right,bottom}
+        if (d.wt_fab_pos.right !== undefined) {
+          this._setPos(innerWidth - SIZE - d.wt_fab_pos.right, innerHeight - SIZE - d.wt_fab_pos.bottom);
+        } else {
+          this._setPos(d.wt_fab_pos.x, d.wt_fab_pos.y);
+        }
+      }
+    } catch {}
+  }
 
   /** Listen for language changes in storage and update labels. */
   _listenLangChange() {

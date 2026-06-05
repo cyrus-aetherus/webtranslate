@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code when working with code in this repository.
+This file is the **Agentic entry point** for Claude Code when working on the WebTranslate repository.
 
 ## 项目概述
 
@@ -14,24 +14,34 @@ WebTranslate — 基于大模型 API 的网页翻译 Chrome 扩展（Manifest V3
 - Vite 构建，Vitest 测试
 - JSZip、DOMPurify、turndown.js
 
+## Agent 默认工作流
+
+```text
+inspect -> plan -> implement -> test -> self-fix -> report
+```
+
+Agent 在用户给定的任务边界内**自主执行**，不需要每步都询问用户。
+详细流程见 `.agent/operating-mode.md`。
+
+### 什么时候必须问用户
+
+1. 需要改 manifest 权限
+2. 需要引入新依赖
+3. 需要删除已有功能
+4. 需要修改 API key / 隐私 / 权限相关逻辑
+5. 需要大规模重构
+6. 需要改变现有用户交互逻辑
+
+### 什么时候不要问用户
+
+1. 修 bug
+2. 补测试
+3. 小范围重构
+4. 修 lint
+5. 修 build
+6. 完成当前任务所需的合理代码修改
+
 ## 代码修改约束
-
-### 修改前流程（强制）
-
-每次修改代码前，必须遵循以下步骤，不得跳过：
-
-0. **对齐理解** — 用户描述一个场景或操作时，不要自行脑补细节。必须确认：
-   - 用户具体做了什么操作（点哪个按钮？在哪里的按钮？）
-   - 期望看到什么效果
-   - 实际看到了什么效果
-   - 如果理解有歧义，先问清楚再继续，不要假设。
-1. **分析** — 完整追踪调用链，确认根因。遇到问题先读代码，不要假设。
-2. **验证** — 通过日志、浏览器实测或代码逻辑，验证假设正确。
-3. **给方案** — 向用户说明问题和修复点，等待用户确认。
-4. **确认后再改** — 用户明确说"改"或等价表达后，才能动手。
-
-禁止看到现象就直接改代码。
-禁止用户描述模糊时自行脑补细节。
 
 ### 修改注意事项
 

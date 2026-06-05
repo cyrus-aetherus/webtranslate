@@ -25,3 +25,4 @@ coverage/
 # E2E artifacts
 .playwright-mcp/
 e2e-*.png
+e2e*/*.png

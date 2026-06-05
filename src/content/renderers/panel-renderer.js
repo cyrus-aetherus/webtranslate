@@ -75,9 +75,22 @@ export class PanelRenderer {
   }
 
   /**
-   * Close the Port connection.
+   * Tell the panel to show an empty state (no translation in progress).
+   */
+  showEmpty() {
+    this._post({ type: 'SHOW_EMPTY' });
+  }
+
+  /**
+   * Close the Port connection.  Tells the panel to clear its content
+   * first so stale translations don't linger after SPA nav or Stop.
    */
   dispose() {
+    // Send clear message BEFORE disconnecting so stale content
+    // from a previous SPA page doesn't remain visible in the panel.
+    if (this._connected && this.port) {
+      try { this.port.postMessage({ type: 'SHOW_EMPTY' }); } catch {}
+    }
     this.port?.disconnect();
     this.port = null;
     this._connected = false;

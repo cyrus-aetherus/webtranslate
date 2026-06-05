@@ -36,7 +36,8 @@ let circuitBreaker;
 let fabComponent;
 let inlineRenderer;
 let panelRenderer;
-let currentMode = 'inline'; // 'inline' | 'panel'
+let currentMode = 'inline'; // 'inline' | 'panel' — reflects the running translation mode
+let _preferredMode = 'inline'; // user's default preference from storage
 
 async function init() {
   // --- Phase 1: Mount FAB immediately (synchronous, before any await) ---
@@ -46,7 +47,10 @@ async function init() {
       const st = stateManager?.get();
       if (st === State.TRANSLATING || st === State.SCANNING) return;
       if (st === State.PAUSED) startTranslation(currentMode);
-      else startTranslation(currentMode || 'inline');
+      // IDLE or ERROR: use user's preferred mode, not currentMode.
+      // After refresh, currentMode may be 'inline' even though the user's
+      // defaultMode is 'panel' (panel can't auto-start without gesture).
+      else startTranslation(_preferredMode || 'inline');
     },
     onPanel: () => {
       const st = stateManager?.get();
@@ -150,6 +154,9 @@ async function init() {
         // was backgrounded, _post() will reconnect on the first message.
         // A small delay gives Chrome a tick to finish any pending reconnect.
         setTimeout(() => reinitPanelSlots(), 80);
+      } else {
+        // Current tab is not in panel mode — tell panel to show empty state
+        panelRenderer?.showEmpty();
       }
       return;
     }
@@ -217,7 +224,9 @@ function updateFabState(to, from) {
       break;
     default:
       fabComponent.setState('idle');
-      fabComponent.setModeBadge(currentMode);
+      // In IDLE state, show the user's preferred mode badge (from storage),
+      // not the current running mode (which may differ after refresh).
+      fabComponent.setModeBadge(_preferredMode || currentMode);
       fabComponent.updateMenu('IDLE', currentMode);
       fabComponent.updateLabels(t);
       break;
@@ -411,6 +420,8 @@ function switchMode(to) {
   }
   if (currentMode === 'panel' && to === 'inline') {
     panelRenderer?.dispose();
+    // Clear wtDone markers so paragraphs can be re-extracted for inline rendering
+    document.querySelectorAll('[data-wt-done]').forEach(el => { delete el.dataset.wtDone; });
   }
 
   // Stop active pipeline without flashing IDLE state on FAB.
@@ -452,6 +463,23 @@ async function startTranslation(mode = currentMode) {
 
   if (!stateManager.transition(State.SCANNING)) return;
 
+  // ═══ Panel mode: open side panel FIRST, before ANY await ═══
+  // chrome.sidePanel.open() MUST be called in a user-gesture context.
+  // The first async operation in this function is the LAST chance to
+  // propagate the user gesture through chrome.runtime.sendMessage.
+  // If we await storage/config before panelRenderer.open(), the gesture
+  // chain breaks and chrome.sidePanel.open() silently fails.
+  if (currentMode === 'panel') {
+    const opened = await panelRenderer.open();
+    if (!opened) {
+      currentMode = 'inline';
+      fabComponent?.setModeBadge('inline');
+      fabComponent?.updateMenu('IDLE', 'inline');
+      fabComponent?.updateLabels(t);
+      showPanelUnavailableToast();
+    }
+  }
+
   // Pre-check: warn if API is not configured
   const config = await chrome.storage.local.get(['apiUrl', 'apiKey', 'model']);
   if (!config.apiUrl || !config.apiKey || !config.model) {
@@ -465,20 +493,6 @@ async function startTranslation(mode = currentMode) {
     console.warn('[WT] No translatable content found');
     stateManager.transition(State.IDLE);
     return;
-  }
-
-  // For panel mode, open the side panel first.
-  // If the panel cannot be opened (sidePanel permission not granted, or
-  // API not available), fall back to inline mode and let the user know.
-  if (currentMode === 'panel') {
-    const opened = await panelRenderer.open();
-    if (!opened) {
-      currentMode = 'inline';
-      fabComponent?.setModeBadge('inline');
-      fabComponent?.updateMenu('IDLE', 'inline');
-      fabComponent?.updateLabels(t);
-      showPanelUnavailableToast();
-    }
   }
 
   // Build items sorted top-down by DOM position.  Assign a sortOrder
@@ -704,14 +718,25 @@ function setupResilience() {
   // When the URL changes without a full page reload (pushState / replaceState /
   // popstate), any active translation refers to the previous page's content.
   // We stop translation to avoid feeding stale DOM into the panel.
+  //
+  // Two-layer detection:
+  //   L1 (pushState/replaceState wrapper) — catches standard SPA navigation
+  //   L2 (URL polling every 1 s)           — catches hash changes, framework
+  //     routing that bypasses pushState, and any other URL mutation.
   if (window.history) {
     const _onRouteChange = () => {
+      // Clear panel content FIRST so stale translations don't linger
+      // (especially important for Panel mode with SPA navigation)
+      if (currentMode === 'panel') {
+        panelRenderer?.showEmpty();
+      }
       if (stateManager.get() !== State.IDLE) {
         console.log('[WT] SPA route change detected — stopping translation');
         clearTranslations();
         stopTranslation();
         chrome.runtime.sendMessage({ type: MSG.STOP_ALL, tabId: TAB_ID }).catch(() => {});
       }
+      _lastUrl = location.href;
     };
 
     // Override pushState / replaceState
@@ -725,6 +750,17 @@ function setupResilience() {
     try { window.history.pushState = _wrap(_origPush); } catch {}
     try { window.history.replaceState = _wrap(_origReplace); } catch {}
     window.addEventListener('popstate', _onRouteChange);
+
+    // L2: URL polling — catches any navigation the wrappers miss
+    let _lastUrl = location.href;
+    const _urlPollTimer = setInterval(() => {
+      if (location.href !== _lastUrl) {
+        console.log('[WT] URL changed (polling):', _lastUrl, '→', location.href);
+        _onRouteChange();
+      }
+    }, 1000);
+    // Clean up on unload
+    window.addEventListener('beforeunload', () => clearInterval(_urlPollTimer), { once: true });
   }
 
   // Graceful stop on page unload
@@ -846,27 +882,41 @@ function showConfigToast() {
 /** Auto-start translation if the user previously enabled it. */
 async function maybeAutoStart() {
   try {
+    // Always read user's preferred mode for the badge + primary Translate button
+    const localCfg = await chrome.storage.local.get(['defaultMode']);
+    _preferredMode = localCfg.defaultMode || 'inline';
+
     const cfg = await chrome.storage.local.get([_stKey('active'), _stKey('mode')]);
     if (cfg[_stKey('active')] && cfg[_stKey('mode')]) {
       const mode = cfg[_stKey('mode')];
-      currentMode = mode;
       // Inline mode can auto-start: no user gesture required.
-      // Panel mode needs a user gesture for chrome.sidePanel.open() —
-      // set currentMode so the FAB's Translate starts the right mode.
+      // Panel mode needs a user gesture for chrome.sidePanel.open().
       if (mode === 'inline') {
+        currentMode = 'inline';
+        updateFabState(State.IDLE, State.IDLE);
         console.log('[WT] Auto-starting inline translation');
         startTranslation('inline');
       } else {
-        console.log('[WT] Panel mode pending — waiting for user gesture');
+        // Panel mode can't auto-start → go to PAUSED state so the user
+        // sees "Resume" button (yellow FAB) instead of IDLE (white FAB).
+        // This clearly signals "translation was interrupted, click to continue".
+        currentMode = 'panel';
+        _preferredMode = 'panel';
+        stateManager.transition(State.PAUSED); // IDLE→PAUSED: safe after refresh
+        // updateFabState for PAUSED hides the badge by default; override it
+        // so the user sees which mode will resume.
+        fabComponent?.setModeBadge('panel');
+        console.log('[WT] Panel mode paused after refresh — click Resume to continue');
       }
     } else {
-      const localCfg = await chrome.storage.local.get(['defaultMode']);
-      currentMode = localCfg.defaultMode || 'inline';
+      // Fresh tab: rebuild menu so badge reflects _preferredMode
+      updateFabState(State.IDLE, State.IDLE);
     }
   } catch {
     try {
       const localCfg = await chrome.storage.local.get(['defaultMode']);
-      currentMode = localCfg.defaultMode || 'inline';
+      _preferredMode = localCfg.defaultMode || 'inline';
+      if (_preferredMode === 'panel') fabComponent?.setModeBadge('panel');
     } catch {}
   }
 }

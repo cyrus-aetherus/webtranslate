@@ -1,0 +1,23 @@
+{
+  "env": {
+    "browser": true,
+    "es2022": true,
+    "node": true,
+    "webextensions": true
+  },
+  "extends": "eslint:recommended",
+  "parserOptions": {
+    "ecmaVersion": "latest",
+    "sourceType": "module"
+  },
+  "globals": {
+    "chrome": "readonly"
+  },
+  "rules": {
+    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+    "no-console": "off",
+    "no-empty": "off",
+    "no-constant-condition": "off",
+    "no-irregular-whitespace": "off"
+  }
+}
