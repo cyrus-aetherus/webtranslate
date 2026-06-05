@@ -106,6 +106,7 @@ export const TEXT_CONTAINER_TAGS = new Set([
 export const EXCLUDED_CONTAINERS = new Set([
   'NAV', 'HEADER', 'FOOTER', 'ASIDE',
   'SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE',
+  'PRE',
 ]);
 
 export const EXCLUDED_ROLES = [

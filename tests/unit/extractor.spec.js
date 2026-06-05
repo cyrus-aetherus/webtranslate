@@ -186,6 +186,17 @@ describe('extractParagraphs — text-driven', () => {
     expect(result[0].textContent).toBe('text');
   });
 
+  it('excludes long code blocks inside pre', () => {
+    document.body.innerHTML = `
+      <main>
+        <pre><code>function hello() { return "world"; }</code></pre>
+        <p>Real text to translate</p>
+      </main>`;
+    const result = extractParagraphs();
+    expect(result.length).toBe(1);
+    expect(result[0].textContent).toBe('Real text to translate');
+  });
+
   it('excludes short text', () => {
     document.body.innerHTML = '<main><p>Hi</p><p>A longer paragraph here</p></main>';
     const result = extractParagraphs();
