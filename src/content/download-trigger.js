@@ -30,8 +30,10 @@ export function generateMarkdown() {
   const article = new Readability(docClone).parse();
 
   let html;
+  let titlePrefix = '';
   if (article && article.content) {
     // Readability found an article — use its cleaned HTML
+    if (article.title) titlePrefix = '# ' + article.title + '\n\n';
     html = article.content;
   } else {
     // Fallback: use body with basic script/style/nav removal
@@ -54,8 +56,8 @@ export function generateMarkdown() {
     }
   });
 
-  // 3. Convert to Markdown and clean up excess whitespace
-  let md = turndown.turndown(tmp.innerHTML);
+  // 3. Convert to Markdown with GFM table support, prepend title
+  let md = titlePrefix + turndown.turndown(tmp.innerHTML);
   // Collapse 3+ consecutive blank lines into 2
   md = md.replace(/\n{4,}/g, '\n\n\n');
   return md.trim() + '\n';
