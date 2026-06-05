@@ -25,12 +25,26 @@ turndown.use(gfm);
  * @returns {string}
  */
 export function generateMarkdown() {
-  // 1. Clone document and remove translation UI blocks BEFORE Readability.
-  //    If Readability processes HTML that contains .wt-inline-block cards,
-  //    it can split the translation text away from the original table/cell
-  //    structure, producing duplicate content in the output.
+  // 1. Clone document and merge translations into original elements.
+  //    .wt-inline-block DIVs are inserted after the original element.
+  //    We append the translated text to the original element, then remove
+  //    the block so Readability sees a single text node with both languages.
   const docClone = document.cloneNode(true);
-  docClone.querySelectorAll('.wt-inline-block, .wt-pending, #wt-fab, #wt-fab-backdrop, .wt-progress').forEach(el => el.remove());
+  docClone.querySelectorAll('#wt-fab, #wt-fab-backdrop, .wt-progress, .wt-pending').forEach(el => el.remove());
+  docClone.querySelectorAll('.wt-inline-block').forEach((block) => {
+    const body = block.querySelector('.wt-inline-body');
+    const trans = body ? body.textContent.trim() : '';
+    if (!trans) { block.remove(); return; }
+    // The original content is in the element before this block.
+    // Append the translation as a newline-separated paragraph.
+    const orig = block.previousElementSibling;
+    if (orig && orig.textContent.trim()) {
+      const p = docClone.createElement('p');
+      p.textContent = `[中文] ${trans}`;
+      orig.insertAdjacentElement('afterend', p);
+    }
+    block.remove();
+  });
 
   // 2. Extract clean article content using Firefox Reader View algorithm
   const article = new Readability(docClone).parse();
@@ -42,7 +56,7 @@ export function generateMarkdown() {
     html = article.content;
   } else {
     const clone = document.body.cloneNode(true);
-    clone.querySelectorAll('script, style, noscript, nav, header, footer, aside, .wt-inline-block, .wt-pending, [role="navigation"], [role="banner"], [role="contentinfo"]').forEach(el => el.remove());
+    clone.querySelectorAll('script, style, noscript, nav, header, footer, aside, [role="navigation"], [role="banner"], [role="contentinfo"]').forEach(el => el.remove());
     html = clone.innerHTML;
   }
 
