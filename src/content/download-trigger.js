@@ -36,7 +36,10 @@ export function generateMarkdown() {
     const trans = body ? body.textContent.trim() : '';
     if (!trans) { block.remove(); return; }
     const orig = block.previousElementSibling;
-    if (orig) {
+    // Only merge translations for non-table elements.  Modifying table
+    // cell DOM (<td>/<th>) breaks Readability's table detection and
+    // causes tables to disappear from the output entirely.
+    if (orig && !orig.closest('table')) {
       orig.appendChild(docClone.createElement('br'));
       orig.appendChild(docClone.createTextNode(`[中文] ${trans}`));
     }
