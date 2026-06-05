@@ -636,9 +636,16 @@ async function startTranslation(mode = currentMode) {
   const _onScroll = () => {
     if (!_scrollTicking) { _scrollTicking = true; requestAnimationFrame(_scrollCheck); }
   };
-  // Start top-down sequential translation
+  // Start top-down sequential translation.
+  // Transition to TRANSLATING FIRST, then start the batch processor.
+  // If _processNextBatch fires before the state transition, it returns
+  // early (SCANNING != TRANSLATING) and cached translations never fill
+  // the panel slots — only a scroll event would trigger _flushVisible.
   console.log(`[WT] Extracted ${_total} paragraphs`);
-  setTimeout(() => _processNextBatch(), 100);
+  setTimeout(() => {
+    stateManager.transition(State.TRANSLATING);
+    _processNextBatch();
+  }, 100);
   window.addEventListener('scroll', _onScroll, { passive: true });
   // Periodic recovery: scan for untranslated visible paragraphs every 3 s.
   // Recovers from missed IntersectionObserver events on fast scroll / SPA.
@@ -652,7 +659,6 @@ async function startTranslation(mode = currentMode) {
   if (!window._wtDisposeScroll) window._wtDisposeScroll = [];
   window._wtDisposeScroll.push(_disposeScroll);
 
-  setTimeout(() => stateManager.transition(State.TRANSLATING), 100);
 }
 
 // ------------------------------------------------------------------
