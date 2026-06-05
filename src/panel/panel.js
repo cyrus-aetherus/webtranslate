@@ -73,6 +73,7 @@ function connect() {
     if (msg.type === 'APPEND_SLOTS')  appendSlots(msg.items);
     if (msg.type === 'BATCH_RESULT')  fillSlots(msg.items);
     if (msg.type === 'SLOT_ERROR')    markSlotErrors(msg.itemIds);
+    if (msg.type === 'SHOW_PLACEHOLDER') _showPlaceholder();
   });
 
   port.onDisconnect.addListener(() => {
@@ -206,6 +207,14 @@ function _updateBadge() {
   const total = totalSlots;
   badgeEl.textContent = tf('panel.translated_count', { count: done });
   listEl.style.setProperty('--wt-pct', total ? Math.round((done / total) * 100) + '%' : '0%');
+}
+
+function _showPlaceholder() {
+  listEl.querySelectorAll('.item').forEach(el => el.remove());
+  slotMap.clear();
+  totalSlots = 0; filledSlots = 0; erroredSlots = 0;
+  badgeEl.textContent = t('panel.switch_back');
+  badgeEl.className = 'waiting';
 }
 
 function escapeHtml(text) {

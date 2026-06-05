@@ -58,6 +58,7 @@ const HARDCODED_EN_FALLBACK = {
   'panel.title': 'WebTranslate',
   'panel.connected': 'Connected',
   'panel.disconnected': 'Disconnected',
+  'panel.switch_back': 'Switch back to translated tab',
   'panel.waiting': 'Waiting for translation...',
   'panel.empty_hint': 'Click the translate button on the page to see translations here',
   'panel.copy': 'Copy',

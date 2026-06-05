@@ -143,6 +143,13 @@ async function init() {
       }
       return;
     }
+    if (msg.type === 'REINIT_PANEL_SLOTS') {
+      const st = stateManager?.get();
+      if (currentMode === 'panel' && (st === State.TRANSLATING || st === State.SCANNING || st === State.PAUSED)) {
+        reinitPanelSlots();
+      }
+      return;
+    }
     if (msg.type === 'SCROLL_TO') {
       let el = document.querySelector(`[data-wt-pg-id="${msg.paragraphId}"]`);
       if (!el) el = document.querySelector(`.wt-inline-block[data-wt-id="${msg.paragraphId}"]`);

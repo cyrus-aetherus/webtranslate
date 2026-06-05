@@ -60,6 +60,7 @@
   "panel.title": "WebTranslate",
   "panel.connected": "已连接",
   "panel.disconnected": "连接断开",
+  "panel.switch_back": "请切换回翻译页面",
   "panel.waiting": "等待翻译...",
   "panel.empty_hint": "在页面中点击翻译按钮，译文将显示在此处",
   "panel.copy": "复制",

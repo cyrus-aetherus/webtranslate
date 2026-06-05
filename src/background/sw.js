@@ -159,28 +159,11 @@ async function handleDownload(message, tabId) {
 async function openSidePanel(tabId) {
   if (chrome.sidePanel && tabId) {
     _panelTabId = tabId;
-    // Attempt per-tab enable so Chrome auto-closes when leaving the tab.
-    // If setOptions fails (e.g. unsupported in this Chrome build), fall
-    // through to plain open() — panel still opens, just stays open on switch.
-    try {
-      await chrome.sidePanel.setOptions({ tabId, enabled: true });
-    } catch (e) {
-      console.warn('[WT] sidePanel.setOptions failed:', e.message);
-    }
     await chrome.sidePanel.open({ tabId });
   } else {
     throw new Error('chrome.sidePanel not available or no tabId');
   }
 }
-
-/**
- * Disable global side panel on install — we use per-tab setOptions instead.
- * Global default_path in manifest would keep panel open across tab switches;
- * disabling it lets Chrome close panel natively when leaving a tab.
- */
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.sidePanel?.setOptions({ enabled: false });
-});
 
 /**
  * Cleanup on suspend
@@ -199,20 +182,19 @@ chrome.runtime.onSuspend?.addListener(() => {
  * all tabs.  CS ports use `wt-panel-cs`; the panel uses `wt-panel-receiver`.
  */
 let _panelTabId = -1;
+let _panelReceiver = null;
+/** @type {object[]} buffered messages waiting for panel to connect */
+const _panelPending = [];
 
 (() => {
-  let panelReceiver = null;
-  /** @type {object[]} buffered messages waiting for panel to connect */
-  const pending = [];
-
   chrome.runtime.onConnect.addListener((port) => {
     if (port.name === 'wt-panel-receiver') {
-      panelReceiver = port;
+      _panelReceiver = port;
       // Flush any messages that arrived before the panel was ready
-      for (const msg of pending) {
-        try { panelReceiver.postMessage(msg); } catch { panelReceiver = null; break; }
+      for (const msg of _panelPending) {
+        try { _panelReceiver.postMessage(msg); } catch { _panelReceiver = null; break; }
       }
-      pending.length = 0;
+      _panelPending.length = 0;
       // Listen for messages FROM the panel (SCROLL_TO, etc.)
       port.onMessage.addListener((msg) => {
         if (msg.type === 'SCROLL_TO' && _panelTabId > 0) {
@@ -220,7 +202,7 @@ let _panelTabId = -1;
         }
       });
       port.onDisconnect.addListener(() => {
-        panelReceiver = null;
+        _panelReceiver = null;
         // Notify content script so it can transition to PAUSED
         if (_panelTabId > 0) {
           chrome.tabs.sendMessage(_panelTabId, { type: 'PANEL_CLOSED' }).catch(() => {});
@@ -231,13 +213,32 @@ let _panelTabId = -1;
 
     if (port.name === 'wt-panel-cs') {
       port.onMessage.addListener((msg) => {
-        if (panelReceiver) {
-          try { panelReceiver.postMessage(msg); } catch { panelReceiver = null; }
+        if (_panelReceiver) {
+          try { _panelReceiver.postMessage(msg); } catch { _panelReceiver = null; }
         } else {
-          pending.push(msg);
+          _panelPending.push(msg);
         }
       });
       return;
     }
   });
 })();
+
+/**
+ * Tab switch management: when the user leaves the translated tab,
+ * tell the panel to show a placeholder. When they return, ask the
+ * content script to rebuild the panel slots from cache.
+ */
+chrome.tabs.onActivated.addListener(({ tabId }) => {
+  if (_panelTabId <= 0) return;
+
+  if (tabId !== _panelTabId) {
+    // Switched away — clear panel content so old translations don't linger
+    if (_panelReceiver) {
+      try { _panelReceiver.postMessage({ type: 'SHOW_PLACEHOLDER' }); } catch {}
+    }
+  } else {
+    // Switched back — rebuild panel with cached translations
+    chrome.tabs.sendMessage(_panelTabId, { type: 'REINIT_PANEL_SLOTS' }).catch(() => {});
+  }
+});
