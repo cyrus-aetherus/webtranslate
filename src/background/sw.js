@@ -159,9 +159,11 @@ async function handleDownload(message, tabId) {
 async function openSidePanel(tabId) {
   if (chrome.sidePanel && tabId) {
     _panelTabId = tabId;
-    // Persist so tab-switch handling survives SW restarts
-    try { await chrome.storage.session.set({ _panelTabId: tabId }); } catch {}
+    // Open FIRST while user-gesture context is still alive.
+    // MV3: any async await before sidePanel.open() can expire the gesture.
     await chrome.sidePanel.open({ tabId });
+    // Persist AFTER successful open so tab-switch handling survives SW restarts.
+    chrome.storage.session?.set({ _panelTabId: tabId }).catch(() => {});
   } else {
     throw new Error('chrome.sidePanel not available or no tabId');
   }
