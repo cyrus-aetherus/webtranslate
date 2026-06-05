@@ -5,6 +5,7 @@ import { vi } from 'vitest';
 
 export function createChromeMock() {
   const storage = {};
+  const sessionStorage = {};
   const listeners = new Set();
 
   const chromeMock = {
@@ -53,6 +54,38 @@ export function createChromeMock() {
           addListener: vi.fn((cb) => listeners.add(cb)),
           removeListener: vi.fn((cb) => listeners.delete(cb)),
         },
+      },
+      session: {
+        get: vi.fn((keys) => {
+          if (Array.isArray(keys)) {
+            const out = {};
+            for (const k of keys) {
+              if (k in sessionStorage) out[k] = sessionStorage[k];
+            }
+            return Promise.resolve(out);
+          }
+          if (typeof keys === 'string') {
+            return keys in sessionStorage ? Promise.resolve({ [keys]: sessionStorage[keys] }) : Promise.resolve({});
+          }
+          if (typeof keys === 'object' && keys !== null) {
+            const out = {};
+            for (const [k, v] of Object.entries(keys)) {
+              if (k in sessionStorage) out[k] = sessionStorage[k];
+              else out[k] = v;
+            }
+            return Promise.resolve(out);
+          }
+          return Promise.resolve({ ...sessionStorage });
+        }),
+        set: vi.fn((items) => {
+          Object.assign(sessionStorage, items);
+          return Promise.resolve();
+        }),
+        remove: vi.fn((keys) => {
+          const arr = Array.isArray(keys) ? keys : [keys];
+          for (const k of arr) delete sessionStorage[k];
+          return Promise.resolve();
+        }),
       },
     },
     runtime: {

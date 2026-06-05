@@ -159,6 +159,8 @@ async function handleDownload(message, tabId) {
 async function openSidePanel(tabId) {
   if (chrome.sidePanel && tabId) {
     _panelTabId = tabId;
+    // Persist so tab-switch handling survives SW restarts
+    try { await chrome.storage.session.set({ _panelTabId: tabId }); } catch {}
     await chrome.sidePanel.open({ tabId });
   } else {
     throw new Error('chrome.sidePanel not available or no tabId');
@@ -186,6 +188,12 @@ let _panelReceiver = null;
 /** @type {object[]} buffered messages waiting for panel to connect */
 const _panelPending = [];
 
+// MV3: Service Worker auto-terminates after idle; restore _panelTabId
+// from session storage so tab-switch handling survives SW restarts.
+chrome.storage.session?.get('_panelTabId').then(({ _panelTabId: id }) => {
+  if (id) _panelTabId = id;
+}).catch(() => {});
+
 (() => {
   chrome.runtime.onConnect.addListener((port) => {
     if (port.name === 'wt-panel-receiver') {
@@ -203,9 +211,12 @@ const _panelPending = [];
       });
       port.onDisconnect.addListener(() => {
         _panelReceiver = null;
+        const closedTabId = _panelTabId;
+        _panelTabId = -1;
+        chrome.storage.session?.remove('_panelTabId').catch(() => {});
         // Notify content script so it can transition to PAUSED
-        if (_panelTabId > 0) {
-          chrome.tabs.sendMessage(_panelTabId, { type: 'PANEL_CLOSED' }).catch(() => {});
+        if (closedTabId > 0) {
+          chrome.tabs.sendMessage(closedTabId, { type: 'PANEL_CLOSED' }).catch(() => {});
         }
       });
       return;

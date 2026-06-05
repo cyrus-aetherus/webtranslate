@@ -146,7 +146,10 @@ async function init() {
     if (msg.type === 'REINIT_PANEL_SLOTS') {
       const st = stateManager?.get();
       if (currentMode === 'panel' && (st === State.TRANSLATING || st === State.SCANNING || st === State.PAUSED)) {
-        reinitPanelSlots();
+        // Rebuild immediately; if the panel Port was torn down while the tab
+        // was backgrounded, _post() will reconnect on the first message.
+        // A small delay gives Chrome a tick to finish any pending reconnect.
+        setTimeout(() => reinitPanelSlots(), 80);
       }
       return;
     }
