@@ -35,13 +35,10 @@ export function generateMarkdown() {
     const body = block.querySelector('.wt-inline-body');
     const trans = body ? body.textContent.trim() : '';
     if (!trans) { block.remove(); return; }
-    // The original content is in the element before this block.
-    // Append the translation as a newline-separated paragraph.
     const orig = block.previousElementSibling;
-    if (orig && orig.textContent.trim()) {
-      const p = docClone.createElement('p');
-      p.textContent = `[中文] ${trans}`;
-      orig.insertAdjacentElement('afterend', p);
+    if (orig) {
+      orig.appendChild(docClone.createElement('br'));
+      orig.appendChild(docClone.createTextNode(`[中文] ${trans}`));
     }
     block.remove();
   });
