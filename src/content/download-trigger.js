@@ -25,40 +25,29 @@ turndown.use(gfm);
  * @returns {string}
  */
 export function generateMarkdown() {
-  // 1. Extract clean article content using Firefox Reader View algorithm
+  // 1. Clone document and remove translation UI blocks BEFORE Readability.
+  //    If Readability processes HTML that contains .wt-inline-block cards,
+  //    it can split the translation text away from the original table/cell
+  //    structure, producing duplicate content in the output.
   const docClone = document.cloneNode(true);
+  docClone.querySelectorAll('.wt-inline-block, .wt-pending, #wt-fab, #wt-fab-backdrop, .wt-progress').forEach(el => el.remove());
+
+  // 2. Extract clean article content using Firefox Reader View algorithm
   const article = new Readability(docClone).parse();
 
   let html;
   let titlePrefix = '';
   if (article && article.content) {
-    // Readability found an article — use its cleaned HTML
     if (article.title) titlePrefix = '# ' + article.title + '\n\n';
     html = article.content;
   } else {
-    // Fallback: use body with basic script/style/nav removal
     const clone = document.body.cloneNode(true);
-    clone.querySelectorAll('script, style, noscript, nav, header, footer, aside, [role="navigation"], [role="banner"], [role="contentinfo"]').forEach(el => el.remove());
+    clone.querySelectorAll('script, style, noscript, nav, header, footer, aside, .wt-inline-block, .wt-pending, [role="navigation"], [role="banner"], [role="contentinfo"]').forEach(el => el.remove());
     html = clone.innerHTML;
   }
 
-  // 2. Replace inline translation blocks with their text
-  const tmp = document.createElement('div');
-  tmp.innerHTML = html;
-  tmp.querySelectorAll('.wt-inline-block').forEach((block) => {
-    const body = block.querySelector('.wt-inline-body');
-    if (body) {
-      const span = document.createElement('span');
-      span.textContent = ` [${body.textContent}] `;
-      block.replaceWith(span);
-    } else {
-      block.remove();
-    }
-  });
-
   // 3. Convert to Markdown with GFM table support, prepend title
-  let md = titlePrefix + turndown.turndown(tmp.innerHTML);
-  // Collapse 3+ consecutive blank lines into 2
+  let md = titlePrefix + turndown.turndown(html);
   md = md.replace(/\n{4,}/g, '\n\n\n');
   return md.trim() + '\n';
 }
