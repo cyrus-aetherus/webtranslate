@@ -37,7 +37,8 @@
     "@mozilla/readability": "^0.6.0",
     "dompurify": "^3.0.6",
     "jszip": "^3.10.1",
-    "turndown": "^7.1.2"
+    "turndown": "^7.1.2",
+    "turndown-plugin-gfm": "^1.0.2"
   },
   "engines": {
     "node": ">=20"

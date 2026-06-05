@@ -9,12 +9,14 @@
  */
 
 import TurndownService from 'turndown';
+import { gfm } from 'turndown-plugin-gfm';
 import { Readability } from '@mozilla/readability';
 
 const turndown = new TurndownService({
   headingStyle: 'atx',
   codeBlockStyle: 'fenced',
 });
+turndown.use(gfm);
 
 /**
  * Generate Markdown from the current page content.
