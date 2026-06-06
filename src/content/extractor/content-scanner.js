@@ -251,12 +251,24 @@ function groupAdjacentBlocks(blocks) {
 /**
  * Two elements belong to the same logical group when:
  * 1. Same direct parent, OR
- * 2. Their parents are adjacent sibling DIVs/SPANs in the same grandparent
- *    (handles arXiv's ltx_para pattern: many sibling container divs
- *     each wrapping one or two P elements within a section).
+ * 2. Both are inside the same SVG foreignObject (Summary boxes, etc.)
  */
 function sameLogicalGroup(el1, el2) {
-  // Only group elements that share the same direct parent.
-  // Different containers (ltx_para, div, etc.) are logical boundaries.
-  return el1.parentElement === el2.parentElement;
+  if (el1.parentElement === el2.parentElement) return true;
+
+  // Elements inside the same foreignObject form one logical unit
+  // (e.g. arXiv "Summary & Ideas" boxes rendered as SVG foreignObject)
+  const fo = findForeignObject(el1);
+  if (fo && fo === findForeignObject(el2)) return true;
+
+  return false;
+}
+
+function findForeignObject(el) {
+  let node = el;
+  while (node) {
+    if (node.tagName.toUpperCase() === 'FOREIGNOBJECT') return node;
+    node = node.parentElement;
+  }
+  return null;
 }

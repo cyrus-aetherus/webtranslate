@@ -1,13 +1,13 @@
-/**
- * FabComponent — Material 3 floating action button.
+﻿/**
+ * FabComponent 鈥?Material 3 floating action button.
  *
  * Design language:
  *   White surface, subtle shadows, purple primary (#6750a4)
  *   Pill-shaped buttons (20px radius), 12px card corners
  *   Compact radial menu with clean labels & SVG line icons
- *   Context-aware dynamic menu — items change based on translation state
+ *   Context-aware dynamic menu 鈥?items change based on translation state
  *
- * Lifecycle: IDLE → TRANSLATING → PAUSED
+ * Lifecycle: IDLE 鈫?TRANSLATING 鈫?PAUSED
  *   IDLE:         [Translate] [Panel]   Download, Settings
  *   TRANSLATING:  [Stop]       [Switch] Download, Settings
  *   PAUSED:       [Translate]  [Retranslate] [Clear] Download, Settings
@@ -33,8 +33,8 @@ const CSS = `
 
 /* ---- IDLE ---- */
 #wt-fab.wt-idle .wt-fab-t{fill:#6750a4;}
-#wt-fab.wt-idle .wt-fab-ring{stroke:#cac4d0;fill:none;}
-#wt-fab.wt-idle .wt-fab-bracket{stroke:#cac4d0;fill:none;}
+#wt-fab.wt-idle .wt-fab-ring{stroke:#9e95b5;fill:none;}
+#wt-fab.wt-idle .wt-fab-bracket{stroke:#9e95b5;fill:none;}
 
 /* ---- ACTIVE (TRANSLATING) ---- */
 #wt-fab.wt-active{background:#eaddff;}
@@ -54,7 +54,7 @@ const CSS = `
 #wt-fab.wt-error .wt-fab-ring{stroke:#b3261e;fill:none;}
 #wt-fab.wt-error .wt-fab-bracket{stroke:#b3261e;fill:none;}
 
-/* Pulse animation — draws attention when paused */
+/* Pulse animation 鈥?draws attention when paused */
 #wt-fab.wt-pulse{animation:wt-pulse .6s ease;}
 @keyframes wt-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.18)}}
 
@@ -84,9 +84,9 @@ const CSS = `
   border:1px solid #e7e0ec;font-weight:500;font-size:12px;color:#1d1b20;
   box-shadow:0 1px 3px rgba(0,0,0,.06);}
 
-/* Primary action (main button — larger, neutral idle, purple on hover) */
+/* Primary action (main button 鈥?larger, neutral idle, purple on hover) */
 .wt-fab-menu-item.wt-primary .wt-mi-dot{width:42px;height:42px;
-  background:#fff;border:2px solid #cac4d0;}
+  background:#fff;border:2px solid #9e95b5;}
 .wt-fab-menu-item.wt-primary .wt-mi-label{font-weight:600;color:#1d1b20;}
 .wt-fab-menu-item.wt-primary:hover .wt-mi-dot{background:#eaddff;border-color:#6750a4;}
 .wt-fab-menu-item.wt-primary:hover .wt-mi-dot svg{stroke:#6750a4;}
@@ -320,7 +320,7 @@ export class FabComponent {
     }
     this._labelEls = [];
 
-    // Build new items — append to _menuContainer, NOT to menuEl (backdrop)
+    // Build new items 鈥?append to _menuContainer, NOT to menuEl (backdrop)
     const items = getMenuItems(state, mode);
     if (!this._menuContainer) return;
 
