@@ -21,10 +21,10 @@ function injectStyles() {
   _stylesInjected = true;
   const css = `
 .wt-inline-block{font-family:'Segoe UI Variable','Segoe UI',system-ui,-apple-system,sans-serif;
-  position:relative;margin:4px 0;border-radius:6px;border:1px solid #e7e0ec;
-  background:#fff;color:#1d1b20;font-size:13px;line-height:1.45;
-  box-shadow:0 1px 2px rgba(0,0,0,.04);
-  padding:6px 10px;word-break:break-word;
+  position:relative;margin:3px 0;border-radius:0 4px 4px 0;border:none;border-left:3px solid #6750a4;
+  background:#f8f5ff;color:#4a4458;font-size:13px;line-height:1.5;
+  
+  padding:3px 10px;word-break:break-word;
   animation:wt-fade-in .2s ease;}
 @keyframes wt-fade-in{from{opacity:0;transform:translateY(2px)}to{opacity:1;transform:translateY(0)}}
 .wt-inline-badge{display:inline-flex;align-items:center;margin-right:3px;vertical-align:middle;}

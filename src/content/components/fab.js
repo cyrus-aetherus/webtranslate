@@ -26,7 +26,7 @@ const CSS = `
   border-radius:50%;cursor:pointer;user-select:none;touch-action:none;
   display:flex;align-items:center;justify-content:center;
   font-family:'Segoe UI Variable','Segoe UI',system-ui,-apple-system,sans-serif;
-  background:#fff;
+  background:#f3f0fa;
   box-shadow:0 1px 3px rgba(0,0,0,.12),0 4px 12px rgba(0,0,0,.08);
   transition:transform .2s,box-shadow .2s;}
 #wt-fab:hover{transform:scale(1.08);box-shadow:0 2px 6px rgba(0,0,0,.14),0 6px 18px rgba(0,0,0,.1);}
@@ -76,17 +76,17 @@ const CSS = `
   font-size:13px;color:#1d1b20;transition:opacity .2s,transform .25s cubic-bezier(.2,0,0,1);}
 .wt-fab-menu-item .wt-mi-dot{width:36px;height:36px;border-radius:50%;
   display:flex;align-items:center;justify-content:center;
-  background:#fff;flex-shrink:0;border:1px solid #e7e0ec;
+  background:#f3f0fa;flex-shrink:0;border:1px solid #e7e0ec;
   box-shadow:0 1px 3px rgba(0,0,0,.08);
   transition:background .15s,transform .15s;}
 .wt-fab-menu-item:hover .wt-mi-dot{background:#eaddff;transform:scale(1.08);}
-.wt-fab-menu-item .wt-mi-label{background:#fff;padding:5px 12px;border-radius:16px;
+.wt-fab-menu-item .wt-mi-label{background:#f3f0fa;padding:5px 12px;border-radius:16px;
   border:1px solid #e7e0ec;font-weight:500;font-size:12px;color:#1d1b20;
   box-shadow:0 1px 3px rgba(0,0,0,.06);}
 
 /* Primary action (main button 鈥?larger, neutral idle, purple on hover) */
 .wt-fab-menu-item.wt-primary .wt-mi-dot{width:42px;height:42px;
-  background:#fff;border:2px solid #9e95b5;}
+  background:#f3f0fa;border:2px solid #9e95b5;}
 .wt-fab-menu-item.wt-primary .wt-mi-label{font-weight:600;color:#1d1b20;}
 .wt-fab-menu-item.wt-primary:hover .wt-mi-dot{background:#eaddff;border-color:#6750a4;}
 .wt-fab-menu-item.wt-primary:hover .wt-mi-dot svg{stroke:#6750a4;}
