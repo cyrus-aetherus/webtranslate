@@ -197,6 +197,53 @@ describe('extractParagraphs — text-driven', () => {
     expect(result[0].textContent).toBe('Real text to translate');
   });
 
+  it('excludes p tags containing inline math elements', () => {
+    document.body.innerHTML = `
+      <main>
+        <p>We formalize an agent parameterized by <math><mi>θ</mi></math></p>
+        <p>A plain paragraph without math</p>
+      </main>`;
+    const result = extractParagraphs();
+    expect(result.length).toBe(1);
+    expect(result[0].textContent).toBe('A plain paragraph without math');
+  });
+
+  it('excludes td elements containing math in equation tables', () => {
+    document.body.innerHTML = `
+      <main>
+        <table class="ltx_equation">
+          <tr><td class="ltx_eqn_cell"><math><mi>a</mi><mo>+</mo><mi>b</mi></math></td></tr>
+        </table>
+        <p>Regular text after equation</p>
+      </main>`;
+    const result = extractParagraphs();
+    expect(result.length).toBe(1);
+    expect(result[0].textContent).toBe('Regular text after equation');
+  });
+
+  it('excludes div containing svg elements', () => {
+    document.body.innerHTML = `
+      <main>
+        <div class="graph-container"><svg><circle r="10"/></svg>Graph description</div>
+        <p>Plain text paragraph</p>
+      </main>`;
+    const result = extractParagraphs();
+    expect(result.length).toBe(1);
+    expect(result[0].tagName).toBe('P');
+  });
+
+  it('still extracts plain td without math', () => {
+    document.body.innerHTML = `
+      <main>
+        <table><tr><td>Simple table cell text here</td></tr></table>
+        <p>Another paragraph</p>
+      </main>`;
+    const result = extractParagraphs();
+    expect(result.length).toBe(2);
+    expect(result[0].textContent).toBe('Simple table cell text here');
+    expect(result[1].textContent).toBe('Another paragraph');
+  });
+
   it('excludes short text', () => {
     document.body.innerHTML = '<main><p>Hi</p><p>A longer paragraph here</p></main>';
     const result = extractParagraphs();

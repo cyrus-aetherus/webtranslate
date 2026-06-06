@@ -10,6 +10,7 @@ import {
   EXCLUDED_CONTAINERS,
   EXCLUDED_ROLES,
   EXCLUDED_CLASS_PATTERNS,
+  PROTECTED_TAGS,
 } from '../../shared/constants.js';
 import { isPureUrl, isShortNumberOrTimestamp } from '../../shared/utils.js';
 
@@ -42,6 +43,8 @@ export function scanTextBlocks(root) {
 
     // Case 1: semantic translatable tag — extract directly
     if (TRANSLATABLE_TAGS.has(tag)) {
+      // Skip elements that contain protected tags (math, code, pre, svg)
+      if (hasProtectedDescendant(el)) return;
       const text = getText(el);
       if (isContentBlock(text, el)) {
         results.push({ element: el, text });
@@ -65,6 +68,8 @@ export function scanTextBlocks(root) {
     const text = getText(el);
     const directText = getDirectText(el);
     if (directText.length >= MIN_DIRECT_TEXT_LENGTH && isContentBlock(text, el)) {
+      // Skip elements that contain protected tags (math, code, pre, svg)
+      if (hasProtectedDescendant(el)) return;
       results.push({ element: el, text });
       return;
     }
@@ -147,4 +152,9 @@ function hasInteractiveDescendant(el) {
 
 function hasTranslatableDescendant(el) {
   return el.querySelector(Array.from(TRANSLATABLE_TAGS).join(',')) !== null;
+}
+
+function hasProtectedDescendant(el) {
+  // Lowercase for jsdom compatibility (MathML/SVG elements use lowercase tagName in queries)
+  return el.querySelector(Array.from(PROTECTED_TAGS).map(t => t.toLowerCase()).join(',')) !== null;
 }
