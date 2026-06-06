@@ -259,7 +259,7 @@ describe('extractParagraphs — text-driven', () => {
     expect(result[0].text).toBe('Regular text after table');
   });
 
-  it('groups siblings across wrapper DIVs into section-level blocks', () => {
+  it('groups siblings within the same parent, not across different containers', () => {
     document.body.innerHTML = `
       <main>
         <div class="ltx_para">
@@ -272,14 +272,27 @@ describe('extractParagraphs — text-driven', () => {
         </div>
       </main>`;
     const result = extractParagraphs();
-    // All 3 P elements: P1,P2 in ltx_para#1 (same parent) → grouped
-    // P2→P3: both parents are sibling DIVs in <main> → merged via grandparent rule
-    // Result: 1 section-level block with all 3 elements
-    expect(result.length).toBe(1);
-    expect(result[0].allElements.length).toBe(3);
+    // P1+P2 in ltx_para#1 (same parent) → 1 group
+    // P3 in ltx_para#2 (different parent) → separate group
+    expect(result.length).toBe(2);
+    expect(result[0].allElements.length).toBe(2);
     expect(result[0].text).toContain('A policy parameterized');
     expect(result[0].text).toContain('where');
-    expect(result[0].text).toContain('A separate section paragraph');
+    expect(result[1].text).toContain('A separate section paragraph');
+  });
+
+  it('does not extract elements inside table cells', () => {
+    document.body.innerHTML = `
+      <main>
+        <table>
+          <tr><td><span>Table cell content that should not be translated</span></td></tr>
+        </table>
+        <p>Paragraph outside table should be translated.</p>
+      </main>`;
+    const result = extractParagraphs();
+    // Only the P outside the table should be extracted
+    expect(result.length).toBe(1);
+    expect(result[0].text).toContain('Paragraph outside table');
   });
 
   it('excludes short text', () => {
@@ -302,7 +315,7 @@ describe('extractParagraphs — text-driven', () => {
     expect(result.length).toBe(1);
   });
 
-  it('extracts headings and list items', () => {
+  it('extracts headings and list items grouped by parent', () => {
     document.body.innerHTML = `
       <main>
         <h1>Title</h1>
@@ -311,10 +324,12 @@ describe('extractParagraphs — text-driven', () => {
       </main>
     `;
     const result = extractParagraphs();
-    // h1+p in <main> → 1 group; li siblings in <ul> → 1 group
+    // h1+p in <main> → 1 group; li+li in <ul> → 1 group
     expect(result.length).toBe(2);
-    expect(result[0].allElements.length).toBe(2); // h1 + p
-    expect(result[1].allElements.length).toBe(2); // li + li
+    // First group: h1 + p (same parent = <main>)
+    expect(result[0].allElements.length).toBe(2);
+    // Second group: li + li (same parent = <ul>)
+    expect(result[1].allElements.length).toBe(2);
   });
 
   it('excludes ad-like containers by class name', () => {

@@ -38,6 +38,10 @@ export function scanTextBlocks(root) {
     // Skip elements inside protected containers (math, pre, code, svg)
     if (isInsideProtected(el)) return;
 
+    // Skip elements inside table cells — prevents table content from being
+    // extracted as individual translation cards
+    if (isInsideTable(el)) return;
+
     // Skip already-translated elements and translation UI cards
     if (el.dataset?.wtDone) return;
     if (el.classList?.contains('wt-inline-block') || el.classList?.contains('wt-pending')) return;
@@ -161,6 +165,19 @@ function hasProtectedDescendant(el) {
   return el.querySelector(Array.from(PROTECTED_TAGS).map(t => t.toLowerCase()).join(',')) !== null;
 }
 
+/** Check if the element is inside a table (TD, TH, TR, TABLE ancestors). */
+function isInsideTable(el) {
+  let node = el.parentElement;
+  while (node) {
+    const tag = node.tagName;
+    if (tag === 'TD' || tag === 'TH') return true;
+    // Stop at block-level containers — don't walk past section boundaries
+    if (tag === 'SECTION' || tag === 'ARTICLE' || tag === 'MAIN' || tag === 'BODY') return false;
+    node = node.parentElement;
+  }
+  return false;
+}
+
 /** Check if the element is inside a protected container (math, pre, code, svg).
  *  SVG container elements (<g>, <defs>, <a>) and <foreignObject> are NOT
  *  protected — they may contain translatable HTML content. */
@@ -239,17 +256,7 @@ function groupAdjacentBlocks(blocks) {
  *     each wrapping one or two P elements within a section).
  */
 function sameLogicalGroup(el1, el2) {
-  if (el1.parentElement === el2.parentElement) return true;
-
-  const p1 = el1.parentElement;
-  const p2 = el2.parentElement;
-  if (p1 && p2 && p1.parentElement === p2.parentElement) {
-    // Only merge across non-semantic wrapper elements (DIV, SPAN).
-    // Semantic containers (ARTICLE, SECTION, MAIN, etc.) are boundaries.
-    const wrapperTags = new Set(['DIV', 'SPAN']);
-    if (wrapperTags.has(p1.tagName) && wrapperTags.has(p2.tagName)) {
-      return true;
-    }
-  }
-  return false;
+  // Only group elements that share the same direct parent.
+  // Different containers (ltx_para, div, etc.) are logical boundaries.
+  return el1.parentElement === el2.parentElement;
 }
