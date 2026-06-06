@@ -35,6 +35,9 @@ export function scanTextBlocks(root) {
     if (el.nodeType !== Node.ELEMENT_NODE) return;
     if (isExcluded(el)) return;
 
+    // Skip elements inside protected containers (math, pre, code, svg)
+    if (isInsideProtected(el)) return;
+
     // Skip already-translated elements and translation UI cards
     if (el.dataset?.wtDone) return;
     if (el.classList?.contains('wt-inline-block') || el.classList?.contains('wt-pending')) return;
@@ -43,8 +46,9 @@ export function scanTextBlocks(root) {
 
     // Case 1: semantic translatable tag — extract directly
     if (TRANSLATABLE_TAGS.has(tag)) {
-      // Skip elements that contain protected tags (math, code, pre, svg)
-      if (hasProtectedDescendant(el)) return;
+      // Skip all table cells — inserting a block <div> card inside a
+      // <tr>/<table> corrupts table layout (tested: 100% overlap rate).
+      if (tag === 'TD' || tag === 'TH') return;
       const text = getText(el);
       if (isContentBlock(text, el)) {
         results.push({ element: el, text });
@@ -79,7 +83,7 @@ export function scanTextBlocks(root) {
   }
 
   for (const child of root.children) walk(child);
-  return results;
+  return groupAdjacentBlocks(results);
 }
 
 // ------------------------------------------------------------------
@@ -157,4 +161,64 @@ function hasTranslatableDescendant(el) {
 function hasProtectedDescendant(el) {
   // Lowercase for jsdom compatibility (MathML/SVG elements use lowercase tagName in queries)
   return el.querySelector(Array.from(PROTECTED_TAGS).map(t => t.toLowerCase()).join(',')) !== null;
+}
+
+/** Check if the element is inside a protected container (math, pre, code, svg). */
+function isInsideProtected(el) {
+  let node = el.parentElement;
+  while (node) {
+    // Normalize to uppercase for cross-browser/jsdom consistency
+    if (PROTECTED_TAGS.has(node.tagName.toUpperCase())) return true;
+    node = node.parentElement;
+  }
+  return false;
+}
+
+// ------------------------------------------------------------------
+// Grouping — adjacent sibling blocks merged into one translation unit
+// ------------------------------------------------------------------
+
+/**
+ * Group sibling blocks that share the same direct parent and have
+ * at least one non-translatable element between them (e.g. equation
+ * tables).  Directly-adjacent paragraphs are kept independent.
+ */
+function groupAdjacentBlocks(blocks) {
+  if (blocks.length <= 1) return blocks;
+
+  const groups = [];
+  let currentGroup = [blocks[0]];
+
+  for (let i = 1; i < blocks.length; i++) {
+    const prev = blocks[i - 1].element;
+    const curr = blocks[i].element;
+
+    if (prev.parentElement === curr.parentElement && hasNonTranslatableBetween(prev, curr)) {
+      currentGroup.push(blocks[i]);
+    } else {
+      groups.push(currentGroup);
+      currentGroup = [blocks[i]];
+    }
+  }
+  groups.push(currentGroup);
+
+  return groups.map(group => {
+    if (group.length === 1) return group[0];
+    return {
+      element: group[group.length - 1].element, // last element → card anchor
+      text: group.map(b => b.text).join('\n\n'),
+      groupElements: group.map(b => b.element),
+    };
+  });
+}
+
+function hasNonTranslatableBetween(el1, el2) {
+  let node = el1.nextElementSibling;
+  let found = false;
+  while (node && node !== el2) {
+    if (TRANSLATABLE_TAGS.has(node.tagName)) return false;
+    found = true;
+    node = node.nextElementSibling;
+  }
+  return node === el2 && found;
 }

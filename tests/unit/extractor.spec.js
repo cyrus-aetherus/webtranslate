@@ -11,6 +11,9 @@ import {
   generateParagraphId,
 } from '../../src/content/extractor/index.js';
 
+// Helper: get the anchor element from an extraction result
+const el = (r) => r.element;
+
 describe('findContentRoots', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
@@ -73,7 +76,7 @@ describe('extractParagraphs — text-driven', () => {
     document.body.innerHTML = '<article><p>First</p><p>Second</p></article>';
     const result = extractParagraphs();
     expect(result.length).toBe(2);
-    expect(result[0].textContent).toBe('First');
+    expect(result[0].text).toBe('First');
   });
 
   it('extracts any tag with enough direct text (text-driven)', () => {
@@ -84,8 +87,8 @@ describe('extractParagraphs — text-driven', () => {
     `;
     const result = extractParagraphs();
     expect(result.length).toBe(1);
-    expect(result[0].tagName).toBe('DIV');
-    expect(result[0].textContent).toBe('This is a plain text block inside a div.');
+    expect(el(result[0]).tagName).toBe('DIV');
+    expect(result[0].text).toBe('This is a plain text block inside a div.');
   });
 
   it('extracts span with direct text', () => {
@@ -96,7 +99,7 @@ describe('extractParagraphs — text-driven', () => {
     `;
     const result = extractParagraphs();
     expect(result.length).toBe(1);
-    expect(result[0].tagName).toBe('SPAN');
+    expect(el(result[0]).tagName).toBe('SPAN');
   });
 
   it('extracts custom element with direct text', () => {
@@ -107,7 +110,7 @@ describe('extractParagraphs — text-driven', () => {
     `;
     const result = extractParagraphs();
     expect(result.length).toBe(1);
-    expect(result[0].tagName).toBe('MY-PARAGRAPH');
+    expect(el(result[0]).tagName).toBe('MY-PARAGRAPH');
   });
 
   it('recurses into elements with semantic descendants instead of extracting parent', () => {
@@ -121,8 +124,8 @@ describe('extractParagraphs — text-driven', () => {
     `;
     const result = extractParagraphs();
     expect(result.length).toBe(2);
-    expect(result[0].tagName).toBe('P');
-    expect(result[1].tagName).toBe('P');
+    expect(el(result[0]).tagName).toBe('P');
+    expect(el(result[1]).tagName).toBe('P');
   });
 
   it('recurses into elements with interactive descendants', () => {
@@ -136,7 +139,7 @@ describe('extractParagraphs — text-driven', () => {
       </main>
     `;
     const result = extractParagraphs();
-    const texts = result.map((el) => el.textContent);
+    const texts = result.map((r) => r.text);
     expect(texts).not.toContain('Username Follow');
     expect(texts).toContain('Real content paragraph.');
   });
@@ -154,8 +157,8 @@ describe('extractParagraphs — text-driven', () => {
     // div has no direct text, recurses to children
     // each span has direct text >= 15, extracted individually
     expect(result.length).toBe(2);
-    expect(result[0].tagName).toBe('SPAN');
-    expect(result[1].tagName).toBe('SPAN');
+    expect(el(result[0]).tagName).toBe('SPAN');
+    expect(el(result[1]).tagName).toBe('SPAN');
   });
 
   it('extracts parent div when it has direct text, skipping child spans', () => {
@@ -166,7 +169,7 @@ describe('extractParagraphs — text-driven', () => {
     `;
     const result = extractParagraphs();
     expect(result.length).toBe(1);
-    expect(result[0].tagName).toBe('DIV');
+    expect(el(result[0]).tagName).toBe('DIV');
   });
 
   it('excludes nav content', () => {
@@ -176,14 +179,14 @@ describe('extractParagraphs — text-driven', () => {
     `;
     const result = extractParagraphs();
     expect(result.length).toBe(1);
-    expect(result[0].textContent).toBe('Keep me');
+    expect(result[0].text).toBe('Keep me');
   });
 
   it('excludes code blocks', () => {
     document.body.innerHTML = '<main><pre><code>code</code></pre><p>text</p></main>';
     const result = extractParagraphs();
     expect(result.length).toBe(1);
-    expect(result[0].textContent).toBe('text');
+    expect(result[0].text).toBe('text');
   });
 
   it('excludes long code blocks inside pre', () => {
@@ -194,68 +197,84 @@ describe('extractParagraphs — text-driven', () => {
       </main>`;
     const result = extractParagraphs();
     expect(result.length).toBe(1);
-    expect(result[0].textContent).toBe('Real text to translate');
+    expect(result[0].text).toBe('Real text to translate');
   });
 
-  it('excludes p tags containing inline math elements', () => {
+  it('p tags with inline math are still extracted (math symbols preserved)', () => {
     document.body.innerHTML = `
       <main>
         <p>We formalize an agent parameterized by <math><mi>θ</mi></math></p>
         <p>A plain paragraph without math</p>
       </main>`;
     const result = extractParagraphs();
-    expect(result.length).toBe(1);
-    expect(result[0].textContent).toBe('A plain paragraph without math');
+    // Both should be extracted — block elements with inline math are NOT skipped
+    expect(result.length).toBe(2);
+    expect(result[0].text).toContain('We formalize');
   });
 
-  it('excludes td elements containing math in equation tables', () => {
+  it('excludes elements inside math/svg/pre/code containers', () => {
+    document.body.innerHTML = `
+      <main>
+        <math><annotation encoding="application/x-tex">m_i = F(\\tau_i \\mid \\phi)</annotation></math>
+        <pre><span class="inner">code inside pre</span></pre>
+        <svg><text>svg text</text></svg>
+        <p>Text outside protected containers</p>
+      </main>`;
+    const result = extractParagraphs();
+    // Only the P outside protected containers should be extracted
+    expect(result.length).toBe(1);
+    expect(result[0].text).toBe('Text outside protected containers');
+  });
+
+  it('excludes td elements (all table cells — prevent layout corruption)', () => {
     document.body.innerHTML = `
       <main>
         <table class="ltx_equation">
           <tr><td class="ltx_eqn_cell"><math><mi>a</mi><mo>+</mo><mi>b</mi></math></td></tr>
         </table>
-        <p>Regular text after equation</p>
+        <table><tr><td>Plain table cell text</td></tr></table>
+        <p>Regular text after table</p>
       </main>`;
     const result = extractParagraphs();
+    // All TD elements are skipped; only the plain P is extracted
     expect(result.length).toBe(1);
-    expect(result[0].textContent).toBe('Regular text after equation');
+    expect(result[0].text).toBe('Regular text after table');
   });
 
-  it('excludes div containing svg elements', () => {
+  it('groups paragraphs within the same section container into one block', () => {
     document.body.innerHTML = `
       <main>
-        <div class="graph-container"><svg><circle r="10"/></svg>Graph description</div>
-        <p>Plain text paragraph</p>
+        <div class="ltx_para">
+          <p>A policy parameterized by <math><mi>θ</mi></math>.</p>
+          <table class="ltx_equation"><tr><td class="ltx_eqn_cell"><math><mi>a</mi></math></td></tr></table>
+          <p>where θ represents the parameter.</p>
+        </div>
+        <div class="ltx_para">
+          <p>A separate section paragraph.</p>
+        </div>
       </main>`;
     const result = extractParagraphs();
-    expect(result.length).toBe(1);
-    expect(result[0].tagName).toBe('P');
-  });
-
-  it('still extracts plain td without math', () => {
-    document.body.innerHTML = `
-      <main>
-        <table><tr><td>Simple table cell text here</td></tr></table>
-        <p>Another paragraph</p>
-      </main>`;
-    const result = extractParagraphs();
+    // Two P elements in same ltx_para → grouped into 1 block
+    // Third P in different ltx_para → separate block
     expect(result.length).toBe(2);
-    expect(result[0].textContent).toBe('Simple table cell text here');
-    expect(result[1].textContent).toBe('Another paragraph');
+    expect(result[0].allElements.length).toBe(2);
+    expect(result[0].text).toContain('A policy parameterized');
+    expect(result[0].text).toContain('where');
+    expect(result[1].text).toContain('A separate section paragraph');
   });
 
   it('excludes short text', () => {
     document.body.innerHTML = '<main><p>Hi</p><p>A longer paragraph here</p></main>';
     const result = extractParagraphs();
     expect(result.length).toBe(1);
-    expect(result[0].textContent).toBe('A longer paragraph here');
+    expect(result[0].text).toBe('A longer paragraph here');
   });
 
   it('excludes pure URLs', () => {
     document.body.innerHTML = '<main><p>https://example.com</p><p>Real text</p></main>';
     const result = extractParagraphs();
     expect(result.length).toBe(1);
-    expect(result[0].textContent).toBe('Real text');
+    expect(result[0].text).toBe('Real text');
   });
 
   it('excludes short numbers', () => {
@@ -283,7 +302,7 @@ describe('extractParagraphs — text-driven', () => {
     `;
     const result = extractParagraphs();
     expect(result.length).toBe(1);
-    expect(result[0].textContent).toBe('Keep me');
+    expect(result[0].text).toBe('Keep me');
   });
 
   it('extracts all sibling articles when wrapped in a common parent', () => {
@@ -296,7 +315,7 @@ describe('extractParagraphs — text-driven', () => {
     `;
     const result = extractParagraphs();
     expect(result.length).toBe(3);
-    const texts = result.map((el) => el.textContent);
+    const texts = result.map((r) => r.text);
     expect(texts).toContain('Project A desc');
     expect(texts).toContain('Project B desc');
     expect(texts).toContain('Project C desc');

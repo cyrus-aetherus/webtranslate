@@ -11,7 +11,11 @@ const MAX_ID_DEPTH = 6;
 
 /**
  * Extract paragraphs eligible for translation from the current document.
- * @returns {Element[]}
+ * Returns block descriptors: {element, text, allElements}
+ * - element: anchor element (last of group) for card positioning & fingerprint
+ * - text: combined text content
+ * - allElements: all elements in this group (to mark all as translated)
+ * @returns {Array<{element: Element, text: string, allElements: Element[]}>}
  */
 export function extractParagraphs() {
   const roots = findContentRoots();
@@ -23,17 +27,24 @@ export function extractParagraphs() {
     for (const block of blocks) {
       if (seen.has(block.element)) continue;
       seen.add(block.element);
-      results.push(block.element);
+      results.push(block);
     }
   }
 
+  // Flatten to descriptor objects
+  const descriptors = results.map(block => ({
+    element: block.element,
+    text: block.text,
+    allElements: block.groupElements || [block.element],
+  }));
+
   // Debug: log extraction summary
   console.log(
-    `[WT] Extracted ${results.length} blocks from ${roots.length} root(s). ` +
-    `Tags: ${results.map((e) => e.tagName.toLowerCase()).join(',') || 'none'}`
+    `[WT] Extracted ${descriptors.length} blocks from ${roots.length} root(s). ` +
+    `Tags: ${descriptors.map(d => d.element.tagName.toLowerCase()).join(',') || 'none'}`
   );
 
-  return results;
+  return descriptors;
 }
 
 /**

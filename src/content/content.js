@@ -8,7 +8,7 @@
  */
 
 import { MSG, State } from '../shared/constants.js';
-import { extractParagraphs, getTranslatableText, generateParagraphId } from './extractor/index.js';
+import { extractParagraphs, generateParagraphId } from './extractor/index.js';
 import { computeFingerprint, markTranslated } from './fingerprint.js';
 import { BatchCollector } from './batch-collector.js';
 import { ObserverManager } from './observer-manager.js';
@@ -263,6 +263,17 @@ const _pendingBatches = new Map();
 // Set of fingerprints currently awaiting API results — prevents
 // duplicate submissions on rapid scroll.
 const _pendingFingerprints = new Set();
+
+/** Mark all elements in a translation group as translated. */
+function markGroup(item) {
+  if (item.allElements && item.allElements.length > 1) {
+    for (const el of item.allElements) {
+      markTranslated(el, item.fingerprint, item.id);
+    }
+  } else {
+    markTranslated(item.element, item.fingerprint, item.id);
+  }
+}
 // Per-tab identity via sessionStorage UUID — survives refresh, NOT shared
 // across tabs.  Ensures opening the same URL in a new tab does not inherit
 // the previous tab's auto-start state.
@@ -285,7 +296,7 @@ function onBatchReady(batch) {
   for (const item of batch) {
     const cached = cacheManager.get(item.fingerprint);
     if (cached) {
-      markTranslated(item.element, item.fingerprint, item.id);
+      markGroup(item);
       if (currentMode === 'inline') {
         inlineRenderer.render(item.element, cached, item.id);
       } else {
@@ -353,7 +364,7 @@ function handleBatchResult(msg) {
     const original = items?.find((u) => u.id === r.id);
     if (!original) continue;
     cacheManager.set(original.fingerprint, r.translation);
-    markTranslated(original.element, original.fingerprint, original.id);
+    markGroup(original);
     if (currentMode === 'inline') {
       inlineRenderer.render(original.element, r.translation, original.id);
     } else {
@@ -488,8 +499,8 @@ async function startTranslation(mode = currentMode) {
     return;
   }
 
-  const paragraphs = extractParagraphs();
-  if (!paragraphs.length) {
+  const paragraphDescs = extractParagraphs();
+  if (!paragraphDescs.length) {
     console.warn('[WT] No translatable content found');
     stateManager.transition(State.IDLE);
     return;
@@ -498,11 +509,11 @@ async function startTranslation(mode = currentMode) {
   // Build items sorted top-down by DOM position.  Assign a sortOrder
   // so the panel can reconstruct correct paragraph order regardless of
   // concurrent batch completion timing.
-  const items = paragraphs.map((el) => {
-    const id = generateParagraphId(el);
-    const fingerprint = computeFingerprint(el);
-    const text = getTranslatableText(el);
-    return { id, fingerprint, text, element: el };
+  // Each descriptor: {element, text, allElements}
+  const items = paragraphDescs.map((p) => {
+    const id = generateParagraphId(p.element);
+    const fingerprint = computeFingerprint(p.element);
+    return { id, fingerprint, text: p.text, element: p.element, allElements: p.allElements };
   }).sort((a, b) => {
     const pos = a.element.compareDocumentPosition(b.element);
     return (pos & Node.DOCUMENT_POSITION_PRECEDING) ? 1 : -1;
@@ -569,7 +580,7 @@ async function startTranslation(mode = currentMode) {
       if (it.element.dataset.wtDone || _pendingFingerprints.has(it.fingerprint)) continue;
       const cached = cacheManager?.get(it.fingerprint);
       if (cached) {
-        markTranslated(it.element, it.fingerprint, it.id);
+        markGroup(it);
         if (currentMode === 'inline') {
           inlineRenderer.render(it.element, cached, it.id);
         } else {
@@ -595,7 +606,8 @@ async function startTranslation(mode = currentMode) {
     const needs = [];
     const newSlots = [];
 
-    for (const el of fresh) {
+    for (const p of fresh) {
+      const el = p.element;
       const id = generateParagraphId(el);
       const fp = computeFingerprint(el);
       const rect = el.getBoundingClientRect();
@@ -607,19 +619,21 @@ async function startTranslation(mode = currentMode) {
         if (currentMode === 'inline') {
           const next = el.nextElementSibling;
           if (next?.classList?.contains('wt-inline-block')) continue;
-          markTranslated(el, fp, id);
+          if (p.allElements) p.allElements.forEach(e => markTranslated(e, fp, id));
+          else markTranslated(el, fp, id);
           inlineRenderer.render(el, cached, id);
         } else {
           // Panel mode: fill cached translation into the matching slot
-          markTranslated(el, fp, id);
-          panelRenderer.renderBatch([{ id, original: getTranslatableText(el), translation: cached }]);
+          if (p.allElements) p.allElements.forEach(e => markTranslated(e, fp, id));
+          else markTranslated(el, fp, id);
+          panelRenderer.renderBatch([{ id, original: p.text, translation: cached }]);
         }
       } else if (!el.dataset.wtDone) {
-        const item = { id, fingerprint: fp, text: getTranslatableText(el), element: el };
+        const item = { id, fingerprint: fp, text: p.text, element: el, allElements: p.allElements };
         needs.push(item);
         // Collect truly new paragraphs for slot appending
         if (currentMode === 'panel') {
-          newSlots.push({ id, original: item.text, sortOrder: items.length + newSlots.length });
+          newSlots.push({ id, original: p.text, sortOrder: items.length + newSlots.length });
         }
       }
     }
@@ -668,14 +682,13 @@ async function startTranslation(mode = currentMode) {
 /** Re-extract paragraphs and init panel slots + fill cached results.
  *  Used when the panel is closed and reopened while translation is running. */
 function reinitPanelSlots() {
-  const paragraphs = extractParagraphs();
-  if (!paragraphs.length) return;
+  const paragraphDescs = extractParagraphs();
+  if (!paragraphDescs.length) return;
 
-  const items = paragraphs.map((el) => {
-    const id = generateParagraphId(el);
-    const fp = computeFingerprint(el);
-    const text = getTranslatableText(el);
-    return { id, fingerprint: fp, text, element: el };
+  const items = paragraphDescs.map((p) => {
+    const id = generateParagraphId(p.element);
+    const fp = computeFingerprint(p.element);
+    return { id, fingerprint: fp, text: p.text, element: p.element };
   }).sort((a, b) => {
     const pos = a.element.compareDocumentPosition(b.element);
     return (pos & Node.DOCUMENT_POSITION_PRECEDING) ? 1 : -1;
