@@ -53,10 +53,12 @@ export class InlineRenderer {
   render(originalEl, translation, paragraphId) {
     injectStyles();
     markTranslated(originalEl, paragraphId);
-    this.removePending(originalEl);
 
-    // Remove any adjacent wt-inline-block / wt-pending (duplicate guard)
-    let sib = originalEl.nextElementSibling;
+    const anchor = findAnchor(originalEl);
+
+    // Remove any adjacent wt-inline-block / wt-pending on the anchor (duplicate guard)
+    this.removePending(originalEl);
+    let sib = anchor.nextElementSibling;
     while (sib && (sib.classList.contains('wt-inline-block') || sib.classList.contains('wt-pending'))) {
       const n = sib.nextElementSibling; sib.remove(); sib = n;
     }
@@ -77,24 +79,24 @@ export class InlineRenderer {
       btn.textContent = f ? '⌄' : '⌃';
     });
 
-    const anchor = findAnchor(originalEl);
     anchor.insertAdjacentElement('afterend', card);
     return card;
   }
 
   showPending(originalEl, paragraphId) {
     injectStyles();
-    if (originalEl.nextElementSibling?.classList?.contains('wt-pending')) return;
+    const anchor = findAnchor(originalEl);
+    if (anchor.nextElementSibling?.classList?.contains('wt-pending')) return;
     const el = document.createElement('div');
     el.className = 'wt-pending';
     el.dataset.wtId = paragraphId;
     el.innerHTML = `<span class="wt-spinner"></span> ${t('inline.translating')}`;
-    const anchor = findAnchor(originalEl);
     anchor.insertAdjacentElement('afterend', el);
   }
 
   removePending(originalEl) {
-    const n = originalEl.nextElementSibling;
+    const anchor = findAnchor(originalEl);
+    const n = anchor.nextElementSibling;
     if (n?.classList?.contains('wt-pending')) n.remove();
   }
 
