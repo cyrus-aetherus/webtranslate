@@ -175,29 +175,38 @@ function isInsideProtected(el) {
 }
 
 // ------------------------------------------------------------------
-// Grouping — adjacent sibling blocks merged into one translation unit
+// Grouping — consecutive sibling blocks merged into one translation unit
 // ------------------------------------------------------------------
 
 /**
- * Group sibling blocks that share the same direct parent and have
- * at least one non-translatable element between them (e.g. equation
- * tables).  Directly-adjacent paragraphs are kept independent.
+ * Group consecutive blocks that belong to the same logical section.
+ * Two blocks are grouped when:
+ *   a) they share the same direct parent, OR
+ *   b) their parents are adjacent siblings in the same grandparent
+ *      (e.g. P elements inside consecutive ltx_para divs within a section).
+ *
+ * If the combined text would exceed MAX_TEXT_LENGTH the group is capped
+ * and a new group starts.
  */
 function groupAdjacentBlocks(blocks) {
   if (blocks.length <= 1) return blocks;
 
   const groups = [];
   let currentGroup = [blocks[0]];
+  let currentLen = blocks[0].text.length;
 
   for (let i = 1; i < blocks.length; i++) {
     const prev = blocks[i - 1].element;
     const curr = blocks[i].element;
+    const nextLen = blocks[i].text.length + 2; // +2 for '\n\n' separator
 
-    if (prev.parentElement === curr.parentElement && hasNonTranslatableBetween(prev, curr)) {
+    if (currentLen + nextLen <= MAX_TEXT_LENGTH && sameLogicalGroup(prev, curr)) {
       currentGroup.push(blocks[i]);
+      currentLen += nextLen;
     } else {
       groups.push(currentGroup);
       currentGroup = [blocks[i]];
+      currentLen = blocks[i].text.length;
     }
   }
   groups.push(currentGroup);
@@ -212,13 +221,25 @@ function groupAdjacentBlocks(blocks) {
   });
 }
 
-function hasNonTranslatableBetween(el1, el2) {
-  let node = el1.nextElementSibling;
-  let found = false;
-  while (node && node !== el2) {
-    if (TRANSLATABLE_TAGS.has(node.tagName)) return false;
-    found = true;
-    node = node.nextElementSibling;
+/**
+ * Two elements belong to the same logical group when:
+ * 1. Same direct parent, OR
+ * 2. Their parents are adjacent sibling DIVs/SPANs in the same grandparent
+ *    (handles arXiv's ltx_para pattern: many sibling container divs
+ *     each wrapping one or two P elements within a section).
+ */
+function sameLogicalGroup(el1, el2) {
+  if (el1.parentElement === el2.parentElement) return true;
+
+  const p1 = el1.parentElement;
+  const p2 = el2.parentElement;
+  if (p1 && p2 && p1.parentElement === p2.parentElement) {
+    // Only merge across non-semantic wrapper elements (DIV, SPAN).
+    // Semantic containers (ARTICLE, SECTION, MAIN, etc.) are boundaries.
+    const wrapperTags = new Set(['DIV', 'SPAN']);
+    if (wrapperTags.has(p1.tagName) && wrapperTags.has(p2.tagName)) {
+      return true;
+    }
   }
-  return node === el2 && found;
+  return false;
 }

@@ -75,8 +75,10 @@ describe('extractParagraphs — text-driven', () => {
   it('extracts p tags', () => {
     document.body.innerHTML = '<article><p>First</p><p>Second</p></article>';
     const result = extractParagraphs();
-    expect(result.length).toBe(2);
-    expect(result[0].text).toBe('First');
+    expect(result.length).toBe(1);
+    expect(result[0].text).toContain('First');
+    expect(result[0].text).toContain('Second');
+    expect(result[0].allElements.length).toBe(2);
   });
 
   it('extracts any tag with enough direct text (text-driven)', () => {
@@ -123,9 +125,9 @@ describe('extractParagraphs — text-driven', () => {
       </main>
     `;
     const result = extractParagraphs();
-    expect(result.length).toBe(2);
+    expect(result.length).toBe(1);
+    expect(result[0].allElements.length).toBe(2);
     expect(el(result[0]).tagName).toBe('P');
-    expect(el(result[1]).tagName).toBe('P');
   });
 
   it('recurses into elements with interactive descendants', () => {
@@ -155,10 +157,10 @@ describe('extractParagraphs — text-driven', () => {
     `;
     const result = extractParagraphs();
     // div has no direct text, recurses to children
-    // each span has direct text >= 15, extracted individually
-    expect(result.length).toBe(2);
+    // each span has direct text >= 15, extracted individually, then grouped by parent
+    expect(result.length).toBe(1);
+    expect(result[0].allElements.length).toBe(2);
     expect(el(result[0]).tagName).toBe('SPAN');
-    expect(el(result[1]).tagName).toBe('SPAN');
   });
 
   it('extracts parent div when it has direct text, skipping child spans', () => {
@@ -207,8 +209,9 @@ describe('extractParagraphs — text-driven', () => {
         <p>A plain paragraph without math</p>
       </main>`;
     const result = extractParagraphs();
-    // Both should be extracted — block elements with inline math are NOT skipped
-    expect(result.length).toBe(2);
+    // Both should be extracted and grouped (same parent)
+    expect(result.length).toBe(1);
+    expect(result[0].allElements.length).toBe(2);
     expect(result[0].text).toContain('We formalize');
   });
 
@@ -241,7 +244,7 @@ describe('extractParagraphs — text-driven', () => {
     expect(result[0].text).toBe('Regular text after table');
   });
 
-  it('groups paragraphs within the same section container into one block', () => {
+  it('groups siblings across wrapper DIVs into section-level blocks', () => {
     document.body.innerHTML = `
       <main>
         <div class="ltx_para">
@@ -254,13 +257,14 @@ describe('extractParagraphs — text-driven', () => {
         </div>
       </main>`;
     const result = extractParagraphs();
-    // Two P elements in same ltx_para → grouped into 1 block
-    // Third P in different ltx_para → separate block
-    expect(result.length).toBe(2);
-    expect(result[0].allElements.length).toBe(2);
+    // All 3 P elements: P1,P2 in ltx_para#1 (same parent) → grouped
+    // P2→P3: both parents are sibling DIVs in <main> → merged via grandparent rule
+    // Result: 1 section-level block with all 3 elements
+    expect(result.length).toBe(1);
+    expect(result[0].allElements.length).toBe(3);
     expect(result[0].text).toContain('A policy parameterized');
     expect(result[0].text).toContain('where');
-    expect(result[1].text).toContain('A separate section paragraph');
+    expect(result[0].text).toContain('A separate section paragraph');
   });
 
   it('excludes short text', () => {
@@ -292,7 +296,10 @@ describe('extractParagraphs — text-driven', () => {
       </main>
     `;
     const result = extractParagraphs();
-    expect(result.length).toBe(4);
+    // h1+p in <main> → 1 group; li siblings in <ul> → 1 group
+    expect(result.length).toBe(2);
+    expect(result[0].allElements.length).toBe(2); // h1 + p
+    expect(result[1].allElements.length).toBe(2); // li + li
   });
 
   it('excludes ad-like containers by class name', () => {
