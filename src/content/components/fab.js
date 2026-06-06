@@ -1,13 +1,13 @@
-﻿/**
- * FabComponent 鈥?Material 3 floating action button.
+/**
+ * FabComponent — Material 3 floating action button.
  *
  * Design language:
  *   White surface, subtle shadows, purple primary (#6750a4)
  *   Pill-shaped buttons (20px radius), 12px card corners
  *   Compact radial menu with clean labels & SVG line icons
- *   Context-aware dynamic menu 鈥?items change based on translation state
+ *   Context-aware dynamic menu — items change based on translation state
  *
- * Lifecycle: IDLE 鈫?TRANSLATING 鈫?PAUSED
+ * Lifecycle: IDLE → TRANSLATING → PAUSED
  *   IDLE:         [Translate] [Panel]   Download, Settings
  *   TRANSLATING:  [Stop]       [Switch] Download, Settings
  *   PAUSED:       [Translate]  [Retranslate] [Clear] Download, Settings
@@ -26,24 +26,35 @@ const CSS = `
   border-radius:50%;cursor:pointer;user-select:none;touch-action:none;
   display:flex;align-items:center;justify-content:center;
   font-family:'Segoe UI Variable','Segoe UI',system-ui,-apple-system,sans-serif;
-  background:#f3f0fa;
+  background:#fff;
   box-shadow:0 1px 3px rgba(0,0,0,.12),0 4px 12px rgba(0,0,0,.08);
   transition:transform .2s,box-shadow .2s;}
 #wt-fab:hover{transform:scale(1.08);box-shadow:0 2px 6px rgba(0,0,0,.14),0 6px 18px rgba(0,0,0,.1);}
 
 /* ---- IDLE ---- */
-#wt-fab.wt-idle .wt-fab-t{fill:#6750a4;}#wt-fab.wt-idle .wt-fab-ring{stroke:#6750a4;fill:none;}#wt-fab.wt-idle .wt-fab-bracket{stroke:#6750a4;fill:none;}
+#wt-fab.wt-idle .wt-fab-t{fill:#6750a4;}
+#wt-fab.wt-idle .wt-fab-ring{stroke:#9e95b5;fill:none;}
+#wt-fab.wt-idle .wt-fab-bracket{stroke:#9e95b5;fill:none;}
 
 /* ---- ACTIVE (TRANSLATING) ---- */
-#wt-fab.wt-active{background:#eaddff;}#wt-fab.wt-active .wt-fab-t{fill:#6750a4;}#wt-fab.wt-active .wt-fab-ring{stroke:#6750a4;fill:none;}#wt-fab.wt-active .wt-fab-bracket{stroke:#6750a4;fill:none;}
+#wt-fab.wt-active{background:#eaddff;}
+#wt-fab.wt-active .wt-fab-t{fill:#6750a4;}
+#wt-fab.wt-active .wt-fab-ring{stroke:#6750a4;fill:none;}
+#wt-fab.wt-active .wt-fab-bracket{stroke:#6750a4;fill:none;}
 
 /* ---- PAUSED ---- */
-#wt-fab.wt-paused{background:#fef7e0;}#wt-fab.wt-paused .wt-fab-t{fill:#795600;}#wt-fab.wt-paused .wt-fab-ring{stroke:#795600;fill:none;}#wt-fab.wt-paused .wt-fab-bracket{stroke:#795600;fill:none;}
+#wt-fab.wt-paused{background:#fef7e0;}
+#wt-fab.wt-paused .wt-fab-t{fill:#795600;}
+#wt-fab.wt-paused .wt-fab-ring{stroke:#795600;fill:none;}
+#wt-fab.wt-paused .wt-fab-bracket{stroke:#795600;fill:none;}
 
 /* ---- ERROR ---- */
-#wt-fab.wt-error{background:#f9dedc;}#wt-fab.wt-error .wt-fab-t{fill:#b3261e;}#wt-fab.wt-error .wt-fab-ring{stroke:#b3261e;fill:none;}#wt-fab.wt-error .wt-fab-bracket{stroke:#b3261e;fill:none;}
+#wt-fab.wt-error{background:#f9dedc;}
+#wt-fab.wt-error .wt-fab-t{fill:#b3261e;}
+#wt-fab.wt-error .wt-fab-ring{stroke:#b3261e;fill:none;}
+#wt-fab.wt-error .wt-fab-bracket{stroke:#b3261e;fill:none;}
 
-/* Pulse animation 鈥?draws attention when paused */
+/* Pulse animation — draws attention when paused */
 #wt-fab.wt-pulse{animation:wt-pulse .6s ease;}
 @keyframes wt-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.18)}}
 
@@ -65,17 +76,17 @@ const CSS = `
   font-size:13px;color:#1d1b20;transition:opacity .2s,transform .25s cubic-bezier(.2,0,0,1);}
 .wt-fab-menu-item .wt-mi-dot{width:36px;height:36px;border-radius:50%;
   display:flex;align-items:center;justify-content:center;
-  background:#f3f0fa;flex-shrink:0;border:1px solid #e7e0ec;
+  background:#fff;flex-shrink:0;border:1px solid #e7e0ec;
   box-shadow:0 1px 3px rgba(0,0,0,.08);
   transition:background .15s,transform .15s;}
 .wt-fab-menu-item:hover .wt-mi-dot{background:#eaddff;transform:scale(1.08);}
-.wt-fab-menu-item .wt-mi-label{background:#f3f0fa;padding:5px 12px;border-radius:16px;
+.wt-fab-menu-item .wt-mi-label{background:#fff;padding:5px 12px;border-radius:16px;
   border:1px solid #e7e0ec;font-weight:500;font-size:12px;color:#1d1b20;
   box-shadow:0 1px 3px rgba(0,0,0,.06);}
 
-/* Primary action (main button 鈥?larger, neutral idle, purple on hover) */
+/* Primary action (main button — larger, neutral idle, purple on hover) */
 .wt-fab-menu-item.wt-primary .wt-mi-dot{width:42px;height:42px;
-  background:#f3f0fa;border:2px solid #9e95b5;}
+  background:#fff;border:2px solid #cac4d0;}
 .wt-fab-menu-item.wt-primary .wt-mi-label{font-weight:600;color:#1d1b20;}
 .wt-fab-menu-item.wt-primary:hover .wt-mi-dot{background:#eaddff;border-color:#6750a4;}
 .wt-fab-menu-item.wt-primary:hover .wt-mi-dot svg{stroke:#6750a4;}
@@ -94,31 +105,31 @@ const CSS = `
 
 // Logo-matching SVG: white "T" + reticle ring + four corner brackets
 const SVG_ICON = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-  <path class="wt-fab-bracket" d="M2 7V2h5" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-  <path class="wt-fab-bracket" d="M17 2h5v5" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-  <path class="wt-fab-bracket" d="M2 17v5h5" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-  <path class="wt-fab-bracket" d="M17 22h5v-5" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle class="wt-fab-ring" cx="12" cy="12" r="6.5" stroke-width="1.6"/>
-  <path class="wt-fab-t" d="M8.5 8.5h7v1.4h-2.8v5.6h-1.4V9.9H8.5z" fill="#6750a4"/>
+  <path class="wt-fab-bracket" d="M2 7V2h5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path class="wt-fab-bracket" d="M17 2h5v5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path class="wt-fab-bracket" d="M2 17v5h5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path class="wt-fab-bracket" d="M17 22h5v-5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle class="wt-fab-ring" cx="12" cy="12" r="6.5" stroke-width="1.8"/>
+  <path class="wt-fab-t" d="M8.5 8.5h7v1.4h-2.8v5.6h-1.4V9.9H8.5z"/>
 </svg>`;
 
 // SVG line icons for radial menu
 const MENU_ICONS = {
-  translate: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1d1b20" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  translate: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#49454f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M5 8l6 6"/><path d="M4 14l6-6 2-3"/>
     <path d="M2 5h12"/><path d="M7 2h1"/>
     <path d="M22 22l-5-10-5 10"/><path d="M14 18h6"/>
   </svg>`,
-  panel: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1d1b20" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  panel: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#49454f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <rect x="3" y="3" width="18" height="18" rx="2"/>
     <line x1="9" y1="3" x2="9" y2="21"/>
   </svg>`,
-  download: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1d1b20" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  download: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#49454f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
     <polyline points="7 10 12 15 17 10"/>
     <line x1="12" y1="15" x2="12" y2="3"/>
   </svg>`,
-  settings: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1d1b20" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  settings: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#49454f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
     <line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/>
     <line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/>
@@ -126,16 +137,16 @@ const MENU_ICONS = {
     <line x1="9" y1="8" x2="15" y2="8"/>
     <line x1="17" y1="16" x2="23" y2="16"/>
   </svg>`,
-  stop: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#b3261e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  stop: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#b3261e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
     <line x1="18" y1="6" x2="6" y2="18"/>
     <line x1="6" y1="6" x2="18" y2="18"/>
   </svg>`,
-  retranslate: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1d1b20" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  retranslate: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#49454f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <polyline points="23 4 23 10 17 10"/>
     <polyline points="1 20 1 14 7 14"/>
     <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
   </svg>`,
-  clear: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1d1b20" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  clear: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#49454f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <polyline points="3 6 5 6 21 6"/>
     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
   </svg>`,
@@ -309,7 +320,7 @@ export class FabComponent {
     }
     this._labelEls = [];
 
-    // Build new items 鈥?append to _menuContainer, NOT to menuEl (backdrop)
+    // Build new items — append to _menuContainer, NOT to menuEl (backdrop)
     const items = getMenuItems(state, mode);
     if (!this._menuContainer) return;
 
