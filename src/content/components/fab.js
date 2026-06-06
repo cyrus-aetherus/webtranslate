@@ -32,27 +32,16 @@ const CSS = `
 #wt-fab:hover{transform:scale(1.08);box-shadow:0 2px 6px rgba(0,0,0,.14),0 6px 18px rgba(0,0,0,.1);}
 
 /* ---- IDLE ---- */
-#wt-fab.wt-idle .wt-fab-t{fill:#6750a4;}
-#wt-fab.wt-idle .wt-fab-ring{stroke:#9e95b5;fill:none;}
-#wt-fab.wt-idle .wt-fab-bracket{stroke:#9e95b5;fill:none;}
+#wt-fab.wt-idle .wt-fab-icon{color:#6750a4;font-size:20px;font-weight:700;line-height:1}
 
 /* ---- ACTIVE (TRANSLATING) ---- */
-#wt-fab.wt-active{background:#eaddff;}
-#wt-fab.wt-active .wt-fab-t{fill:#6750a4;}
-#wt-fab.wt-active .wt-fab-ring{stroke:#6750a4;fill:none;}
-#wt-fab.wt-active .wt-fab-bracket{stroke:#6750a4;fill:none;}
+#wt-fab.wt-active{background:#eaddff;}#wt-fab.wt-active .wt-fab-icon{color:#6750a4;}
 
 /* ---- PAUSED ---- */
-#wt-fab.wt-paused{background:#fef7e0;}
-#wt-fab.wt-paused .wt-fab-t{fill:#795600;}
-#wt-fab.wt-paused .wt-fab-ring{stroke:#795600;fill:none;}
-#wt-fab.wt-paused .wt-fab-bracket{stroke:#795600;fill:none;}
+#wt-fab.wt-paused{background:#fef7e0;}#wt-fab.wt-paused .wt-fab-icon{color:#795600;}
 
 /* ---- ERROR ---- */
-#wt-fab.wt-error{background:#f9dedc;}
-#wt-fab.wt-error .wt-fab-t{fill:#b3261e;}
-#wt-fab.wt-error .wt-fab-ring{stroke:#b3261e;fill:none;}
-#wt-fab.wt-error .wt-fab-bracket{stroke:#b3261e;fill:none;}
+#wt-fab.wt-error{background:#f9dedc;}#wt-fab.wt-error .wt-fab-icon{color:#b3261e;}
 
 /* Pulse animation 鈥?draws attention when paused */
 #wt-fab.wt-pulse{animation:wt-pulse .6s ease;}
@@ -104,14 +93,7 @@ const CSS = `
 `;
 
 // Logo-matching SVG: white "T" + reticle ring + four corner brackets
-const SVG_ICON = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-  <path class="wt-fab-bracket" d="M2 7V2h5" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-  <path class="wt-fab-bracket" d="M17 2h5v5" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-  <path class="wt-fab-bracket" d="M2 17v5h5" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-  <path class="wt-fab-bracket" d="M17 22h5v-5" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle class="wt-fab-ring" cx="12" cy="12" r="6.5" stroke-width="1.5"/>
-  <path class="wt-fab-t" d="M8.5 8.5h7v1.4h-2.8v5.6h-1.4V9.9H8.5z"/>
-</svg>`;
+const SVG_ICON = `<span class="wt-fab-icon">译</span>`;
 
 // SVG line icons for radial menu
 const MENU_ICONS = {

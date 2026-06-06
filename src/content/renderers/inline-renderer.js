@@ -77,7 +77,8 @@ export class InlineRenderer {
       btn.textContent = f ? '⌄' : '⌃';
     });
 
-    originalEl.insertAdjacentElement('afterend', card);
+    const anchor = findAnchor(originalEl);
+    anchor.insertAdjacentElement('afterend', card);
     return card;
   }
 
@@ -88,7 +89,8 @@ export class InlineRenderer {
     el.className = 'wt-pending';
     el.dataset.wtId = paragraphId;
     el.innerHTML = `<span class="wt-spinner"></span> ${t('inline.translating')}`;
-    originalEl.insertAdjacentElement('afterend', el);
+    const anchor = findAnchor(originalEl);
+    anchor.insertAdjacentElement('afterend', el);
   }
 
   removePending(originalEl) {
@@ -114,4 +116,33 @@ function escapeHtml(s) {
   const d = document.createElement('div');
   d.textContent = s;
   return d.innerHTML;
+}
+
+/**
+ * Find the best DOM anchor to insert a translation card after.
+ * For elements inside SVG foreignObject, returns the nearest ancestor
+ * outside the SVG to avoid corrupting the box layout.
+ */
+function findAnchor(el) {
+  // Walk up to find if we're inside a foreignObject
+  let node = el;
+  while (node) {
+    if (node.tagName.toUpperCase() === 'FOREIGNOBJECT') {
+      // Found foreignObject — walk further up past the SVG to the
+      // nearest block-level container (ltx_para or similar).
+      let anchor = node;
+      while (anchor) {
+        const tag = anchor.tagName;
+        const cls = typeof anchor.className === 'string' ? anchor.className : '';
+        // Stop at section/article containers or ltx_para
+        if (/\b(ltx_para|ltx_block)\b/.test(cls)) return anchor;
+        if (tag === 'SECTION' || tag === 'ARTICLE' || tag === 'MAIN') return anchor;
+        if (!anchor.parentElement) return anchor;
+        anchor = anchor.parentElement;
+      }
+      return node.parentElement || node;
+    }
+    node = node.parentElement;
+  }
+  return el;
 }
