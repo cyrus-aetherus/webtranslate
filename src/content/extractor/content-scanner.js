@@ -72,8 +72,6 @@ export function scanTextBlocks(root) {
     const text = getText(el);
     const directText = getDirectText(el);
     if (directText.length >= MIN_DIRECT_TEXT_LENGTH && isContentBlock(text, el)) {
-      // Skip elements that contain protected tags (math, code, pre, svg)
-      if (hasProtectedDescendant(el)) return;
       results.push({ element: el, text });
       return;
     }
@@ -163,12 +161,24 @@ function hasProtectedDescendant(el) {
   return el.querySelector(Array.from(PROTECTED_TAGS).map(t => t.toLowerCase()).join(',')) !== null;
 }
 
-/** Check if the element is inside a protected container (math, pre, code, svg). */
+/** Check if the element is inside a protected container (math, pre, code, svg).
+ *  SVG container elements (<g>, <defs>, <a>) and <foreignObject> are NOT
+ *  protected — they may contain translatable HTML content. */
 function isInsideProtected(el) {
+  if (el.tagName.toUpperCase() === 'FOREIGNOBJECT') return false;
+
   let node = el.parentElement;
   while (node) {
-    // Normalize to uppercase for cross-browser/jsdom consistency
-    if (PROTECTED_TAGS.has(node.tagName.toUpperCase())) return true;
+    const tag = node.tagName.toUpperCase();
+    if (tag === 'FOREIGNOBJECT') return false;
+    if (PROTECTED_TAGS.has(tag)) {
+      // SVG container elements may hold foreignObject with HTML content
+      if (tag === 'SVG') {
+        const et = el.tagName.toUpperCase();
+        if (et === 'G' || et === 'DEFS' || et === 'A' || et === 'SYMBOL') return false;
+      }
+      return true;
+    }
     node = node.parentElement;
   }
   return false;
