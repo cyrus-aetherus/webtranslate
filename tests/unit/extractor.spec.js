@@ -7,7 +7,6 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   extractParagraphs,
   findContentRoots,
-  getTranslatableText,
   generateParagraphId,
 } from '../../src/content/extractor/index.js';
 
@@ -50,20 +49,6 @@ describe('findContentRoots', () => {
     const roots = findContentRoots();
     expect(roots.length).toBe(1);
     expect(roots[0].tagName).toBe('BODY');
-  });
-});
-
-describe('getTranslatableText', () => {
-  it('extracts plain text', () => {
-    const p = document.createElement('p');
-    p.textContent = 'Hello world';
-    expect(getTranslatableText(p)).toBe('Hello world');
-  });
-
-  it('normalizes whitespace', () => {
-    const p = document.createElement('p');
-    p.innerHTML = 'Hello\n\n  world';
-    expect(getTranslatableText(p)).toBe('Hello world');
   });
 });
 

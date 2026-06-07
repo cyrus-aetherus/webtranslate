@@ -26,3 +26,7 @@ coverage/
 .playwright-mcp/
 e2e-*.png
 e2e*/*.png
+test-results/
+*-test.png
+*-icons.png
+dot-pixels.png

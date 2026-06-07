@@ -49,16 +49,6 @@ export function extractParagraphs() {
 }
 
 /**
- * Get clean translatable text from an element.
- * No clone needed — script/style containers are already excluded by the scanner.
- * @param {Element} el
- * @returns {string}
- */
-export function getTranslatableText(el) {
-  return (el.textContent || '').replace(/\s+/g, ' ').trim();
-}
-
-/**
  * Generate a stable paragraph ID based on its DOM path.
  * @param {Element} el
  * @returns {string}

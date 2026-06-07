@@ -31,15 +31,6 @@ export function markTranslated(el, fingerprint, paragraphId) {
 }
 
 /**
- * Check if an element has already been translated.
- * @param {Element} el
- * @returns {boolean}
- */
-export function isTranslated(el) {
-  return el.dataset.wtDone != null;
-}
-
-/**
  * Remove translation markers (used for reset / retry).
  * @param {Element} el
  */

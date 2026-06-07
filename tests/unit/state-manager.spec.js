@@ -46,22 +46,4 @@ describe('StateManager', () => {
     expect(fn).toHaveBeenCalledWith(State.SCANNING, State.IDLE);
   });
 
-  it('does not notify removed listeners', () => {
-    const sm = new StateManager();
-    const fn = vi.fn();
-    sm.onChange(fn);
-    sm.offChange(fn);
-    sm.transition(State.SCANNING);
-    expect(fn).not.toHaveBeenCalled();
-  });
-
-  it('tracks history', () => {
-    const sm = new StateManager();
-    sm.transition(State.SCANNING);
-    sm.transition(State.TRANSLATING);
-    const hist = sm.getHistory();
-    expect(hist.length).toBe(2);
-    expect(hist[0].from).toBe(State.IDLE);
-    expect(hist[0].to).toBe(State.SCANNING);
-  });
 });

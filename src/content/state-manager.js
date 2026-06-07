@@ -21,7 +21,6 @@ export class StateManager {
   constructor() {
     this._state = State.IDLE;
     this._listeners = [];
-    this._history = []; // for debugging
   }
 
   /** @returns {string} current state */
@@ -42,7 +41,6 @@ export class StateManager {
       return false;
     }
     this._state = to;
-    this._history.push({ from, to, at: Date.now() });
     this._notify(to, from);
     return true;
   }
@@ -55,14 +53,6 @@ export class StateManager {
     this._listeners.push(fn);
   }
 
-  /**
-   * Remove a state change listener.
-   * @param {(newState: string, oldState: string) => void} fn
-   */
-  offChange(fn) {
-    this._listeners = this._listeners.filter((l) => l !== fn);
-  }
-
   _notify(to, from) {
     for (const fn of this._listeners) {
       try {
@@ -71,10 +61,5 @@ export class StateManager {
         console.error('[WT] State listener error:', err);
       }
     }
-  }
-
-  /** Debug helper */
-  getHistory() {
-    return [...this._history];
   }
 }

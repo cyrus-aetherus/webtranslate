@@ -39,23 +39,6 @@ export function debounce(fn, delay) {
   };
 }
 
-/**
- * Throttle a function.
- * @param {Function} fn
- * @param {number} interval ms
- * @returns {Function}
- */
-export function throttle(fn, interval) {
-  let last = 0;
-  return function (...args) {
-    const now = Date.now();
-    if (now - last >= interval) {
-      last = now;
-      fn.apply(this, args);
-    }
-  };
-}
-
 // ==================== Validation Helpers ====================
 
 /**

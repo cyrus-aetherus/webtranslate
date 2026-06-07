@@ -40,19 +40,4 @@ export class CircuitBreaker {
     return false;
   }
 
-  /**
-   * Check if breaker is currently open (tripped).
-   * @returns {boolean}
-   */
-  isOpen() {
-    return this._isOpen;
-  }
-
-  /**
-   * Manual reset (e.g. user clicks resume).
-   */
-  reset() {
-    this._failures = 0;
-    this._isOpen = false;
-  }
 }

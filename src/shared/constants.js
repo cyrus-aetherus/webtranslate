@@ -31,22 +31,6 @@ export const State = {
   ERROR: 'ERROR',
 };
 
-// ==================== FAB Icon Mapping ====================
-export const FabIcon = {
-  [State.IDLE]: '🌐',
-  [State.SCANNING]: '🔍',
-  [State.TRANSLATING]: '🔄',
-  [State.PAUSED]: '⏸️',
-  [State.ERROR]: '🔴',
-};
-
-// ==================== Download Progress Stages ====================
-export const DownloadStage = {
-  IMAGES: 'images',
-  PACKING: 'packing',
-  DONE: 'done',
-};
-
 // ==================== Default User Configuration ====================
 export const DEFAULT_CONFIG = {
   apiUrl: '',
@@ -66,10 +50,6 @@ export const DEFAULT_CONFIG = {
 // ==================== Batch Separator Protocol ====================
 export const SEP_PREFIX = '───SEP:';
 export const SEP_END = '───SEP:END───';
-
-export function makeSep(id) {
-  return `${SEP_PREFIX}${id}───`;
-}
 
 // ==================== DOM Selectors ====================
 export const CONTENT_SELECTORS = [
@@ -97,12 +77,6 @@ export const TRANSLATABLE_TAGS = new Set([
   'DD', 'DT', 'FIGCAPTION',
 ]);
 
-// Tags that can act as text containers when they hold direct text
-// without semantic child tags (e.g. <div>text</div>)
-export const TEXT_CONTAINER_TAGS = new Set([
-  'DIV', 'SECTION', 'SPAN',
-]);
-
 export const EXCLUDED_CONTAINERS = new Set([
   'NAV', 'HEADER', 'FOOTER', 'ASIDE',
   'SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE',
@@ -124,11 +98,6 @@ export const EXCLUDED_CLASS_PATTERNS = [
 export const PROTECTED_TAGS = new Set([
   'PRE', 'CODE', 'MATH', 'SVG',
 ]);
-
-// ==================== Cache Key Helpers ====================
-export function cacheKey(tabId) {
-  return `wt_cache_${tabId}`;
-}
 
 // ==================== Model Pricing ($/1K tokens) ====================
 export const MODEL_PRICING = {
