@@ -513,7 +513,7 @@ async function startTranslation(mode = currentMode) {
   const items = paragraphDescs.map((p) => {
     const id = generateParagraphId(p.element);
     const fingerprint = computeFingerprint(p.element);
-    return { id, fingerprint, text: p.text, element: p.element, allElements: p.allElements };
+    return { id, fingerprint, text: p.text, element: p.element, allElements: p.allElements, isTable: p.isTable || false };
   }).sort((a, b) => {
     const pos = a.element.compareDocumentPosition(b.element);
     return (pos & Node.DOCUMENT_POSITION_PRECEDING) ? 1 : -1;
@@ -618,7 +618,7 @@ async function startTranslation(mode = currentMode) {
       if (cached) {
         if (currentMode === 'inline') {
           const next = el.nextElementSibling;
-          if (next?.classList?.contains('wt-inline-block')) continue;
+          if (next?.classList?.contains('wt-inline-block') || next?.classList?.contains('wt-table-translated')) continue;
           if (p.allElements) p.allElements.forEach(e => markTranslated(e, fp, id));
           else markTranslated(el, fp, id);
           inlineRenderer.render(el, cached, id);
@@ -688,7 +688,7 @@ function reinitPanelSlots() {
   const items = paragraphDescs.map((p) => {
     const id = generateParagraphId(p.element);
     const fp = computeFingerprint(p.element);
-    return { id, fingerprint: fp, text: p.text, element: p.element };
+    return { id, fingerprint: fp, text: p.text, element: p.element, isTable: p.isTable || false };
   }).sort((a, b) => {
     const pos = a.element.compareDocumentPosition(b.element);
     return (pos & Node.DOCUMENT_POSITION_PRECEDING) ? 1 : -1;

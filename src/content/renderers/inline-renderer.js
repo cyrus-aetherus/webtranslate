@@ -52,6 +52,12 @@ export class InlineRenderer {
 
   render(originalEl, translation, paragraphId) {
     injectStyles();
+
+    // Table rendering: clone table, translate cells
+    if (originalEl.tagName === 'TABLE') {
+      return this.renderTable(originalEl, translation, paragraphId);
+    }
+
     markTranslated(originalEl, paragraphId);
 
     const anchor = findAnchor(originalEl);
@@ -83,6 +89,47 @@ export class InlineRenderer {
     return card;
   }
 
+  /**
+   * Clone a table, translate each cell's text, and insert below the original.
+   */
+  renderTable(originalTable, translation, paragraphId) {
+    injectStyles();
+    markTranslated(originalTable, paragraphId);
+
+    // Clone the table
+    const clone = originalTable.cloneNode(true);
+    clone.classList.add('wt-table-translated');
+    // Prevent re-scanning the clone as a new table
+    clone.dataset.wtDone = '1';
+    markTranslated(clone, paragraphId);
+    clone.style.marginTop = '8px';
+
+    // Parse translation: lines = rows, tabs = cells
+    const lines = translation.split('\n');
+    const rows = clone.querySelectorAll('tr');
+
+    let lineIdx = 0;
+    for (const row of rows) {
+      const cells = row.querySelectorAll('td, th');
+      if (cells.length === 0) continue;
+      if (lineIdx >= lines.length) break;
+
+      const cellTexts = lines[lineIdx].split('\t');
+      let cellIdx = 0;
+      for (const cell of cells) {
+        if (cellIdx < cellTexts.length) {
+          cell.textContent = cellTexts[cellIdx].trim();
+        }
+        cellIdx++;
+      }
+      lineIdx++;
+    }
+
+    // Insert translated clone after original
+    originalTable.insertAdjacentElement('afterend', clone);
+    return clone;
+  }
+
   showPending(originalEl, paragraphId) {
     injectStyles();
     const anchor = findAnchor(originalEl);
@@ -101,7 +148,7 @@ export class InlineRenderer {
   }
 
   clearAll() {
-    document.querySelectorAll('.wt-inline-block, .wt-pending').forEach(e => e.remove());
+    document.querySelectorAll('.wt-inline-block, .wt-pending, .wt-table-translated').forEach(e => e.remove());
     // Remove wtDone markers so elements can be re-processed on next translation
     document.querySelectorAll('[data-wt-done]').forEach(el => { delete el.dataset.wtDone; });
   }

@@ -31,6 +31,11 @@ export function generateMarkdown() {
   //    the block so Readability sees a single text node with both languages.
   const docClone = document.cloneNode(true);
   docClone.querySelectorAll('#wt-fab, #wt-fab-backdrop, .wt-progress, .wt-pending').forEach(el => el.remove());
+
+  // Remove equation/formula display tables (ltx_equation, ltx_eqn_table) —
+  // these are LaTeX formulas rendered as HTML tables for layout, not content.
+  docClone.querySelectorAll('.ltx_equation, .ltx_eqn_table, .ltx_equationgroup').forEach(el => el.remove());
+
   docClone.querySelectorAll('.wt-inline-block').forEach((block) => {
     const body = block.querySelector('.wt-inline-body');
     const trans = body ? body.textContent.trim() : '';
@@ -46,7 +51,35 @@ export function generateMarkdown() {
     block.remove();
   });
 
-  // 2. Extract clean article content using Firefox Reader View algorithm
+  // 2. Replace content tables with placeholder markers BEFORE Readability.
+  //    Each marker is a <div> with a unique ID — it survives Readability
+  //    and Turndown as plain text.  After the markdown is generated,
+  //    we replace each marker with the corresponding table markdown.
+  //    This keeps tables at their correct position in the document flow.
+  const tableMarkers = new Map(); // markerId -> tableMarkdown
+  let markerSeq = 0;
+
+  docClone.querySelectorAll('table').forEach(t => {
+    const cls = t.className || '';
+    if (/\b(ltx_equation|ltx_eqn_table|ltx_equationgroup)\b/.test(cls)) return;
+    if (t.querySelectorAll('tr').length < 2) return;
+    const md = turndown.turndown(t.outerHTML);
+    if (!md.trim()) return;
+    const markerId = `WTTABLEMARKER${markerSeq++}END`;
+    tableMarkers.set(markerId, md.trim());
+    const marker = docClone.createElement('p');
+    marker.textContent = markerId;
+    // Place marker AFTER the figure so the figcaption (title) appears first
+    const figure = t.closest('figure');
+    if (figure && figure.parentElement) {
+      figure.parentElement.insertBefore(marker, figure.nextElementSibling);
+    } else {
+      t.parentElement?.insertBefore(marker, t.nextElementSibling);
+    }
+    t.remove();
+  });
+
+  // 3. Extract clean article content using Firefox Reader View algorithm
   const article = new Readability(docClone).parse();
 
   let html;
@@ -60,31 +93,39 @@ export function generateMarkdown() {
     html = clone.innerHTML;
   }
 
-  // 3. Convert to Markdown with GFM table support, prepend title
+  // 4. Convert to Markdown.  Then replace table markers with actual table content.
   let md = titlePrefix + turndown.turndown(html);
   md = md.replace(/\n{4,}/g, '\n\n\n');
+  for (const [markerId, tableMd] of tableMarkers) {
+    md = md.replace(markerId, '\n\n' + tableMd + '\n');
+  }
   return md.trim() + '\n';
 }
 
 /**
  * Collect all image URLs inside the content area.
- * @returns {string[]}
+ * Returns objects with both the resolved absolute URL and the original src attribute —
+ * Readability preserves the HTML attribute value which may be relative.
+ * @returns {Array<{absolute: string, original: string}>}
  */
 export function collectImageUrls() {
   const root = document.querySelector('article, main, .content, .post, .entry-content, [role="main"]')
     || document.body;
 
   const images = root.querySelectorAll('img');
+  const seen = new Set();
   const urls = [];
 
   for (const img of images) {
-    const src = img.src;
-    if (src && !src.startsWith('data:')) {
-      urls.push(src);
-    }
+    const absolute = img.src;
+    if (!absolute || absolute.startsWith('data:')) continue;
+    if (seen.has(absolute)) continue;
+    seen.add(absolute);
+    const original = img.getAttribute('src') || absolute;
+    urls.push({ absolute, original });
   }
 
-  return [...new Set(urls)]; // deduplicate
+  return urls;
 }
 
 /**
@@ -103,7 +144,7 @@ export async function triggerDownload(pageTitle, markdown, imageUrls) {
     downloadId,
     pageTitle: sanitizeFilename(pageTitle),
     markdown,
-    imageUrls,
+    imageUrls, // Array<{absolute: string, original: string}>
   });
 
   return { downloadId };

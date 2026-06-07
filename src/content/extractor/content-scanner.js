@@ -48,6 +48,19 @@ export function scanTextBlocks(root) {
 
     const tag = el.tagName;
 
+    // Case 0: content tables — extract as translatable block
+    if (tag === 'TABLE') {
+      // Skip translated table clones and translation UI
+      if (el.classList.contains('wt-table-translated')) return;
+      if (isContentTable(el)) {
+        const tableText = extractTableText(el);
+        if (tableText && tableText.length >= MIN_TEXT_LENGTH && tableText.length <= MAX_TEXT_LENGTH) {
+          results.push({ element: el, text: tableText, isTable: true });
+        }
+      }
+      return; // Don't recurse into tables
+    }
+
     // Case 1: semantic translatable tag — extract directly
     if (TRANSLATABLE_TAGS.has(tag)) {
       // Skip all table cells — inserting a block <div> card inside a
@@ -160,6 +173,41 @@ function hasTranslatableDescendant(el) {
   return el.querySelector(Array.from(TRANSLATABLE_TAGS).join(',')) !== null;
 }
 
+/**
+ * Check if a table is a content table (not an equation/formula table).
+ * Equation tables have class ltx_equation, ltx_eqn_table, etc.
+ */
+function isContentTable(table) {
+  const cls = typeof table.className === 'string' ? table.className : '';
+  // Skip equation/formula display tables
+  if (/\b(ltx_equation|ltx_eqn_table|ltx_equationgroup)\b/.test(cls)) return false;
+  // Must have at least 2 rows or 4 cells to be meaningful content
+  const rows = table.querySelectorAll('tr').length;
+  const cells = table.querySelectorAll('td, th').length;
+  return rows >= 2 && cells >= 4;
+}
+
+/**
+ * Extract structured text from a table: each row as a line, cells separated by tabs.
+ */
+function extractTableText(table) {
+  const rows = table.querySelectorAll('tr');
+  const lines = [];
+  for (const row of rows) {
+    const cells = row.querySelectorAll('td, th');
+    if (cells.length === 0) continue;
+    const cellTexts = [];
+    for (const cell of cells) {
+      // Keep empty cells — preserves column alignment for cloned table
+      const text = (cell.textContent || '').replace(/\s+/g, ' ').trim();
+      cellTexts.push(text);
+    }
+    // Only include rows that have at least some text
+    if (cellTexts.some(t => t.length > 0)) lines.push(cellTexts.join('\t'));
+  }
+  return lines.join('\n');
+}
+
 function hasProtectedDescendant(el) {
   // Lowercase for jsdom compatibility (MathML/SVG elements use lowercase tagName in queries)
   return el.querySelector(Array.from(PROTECTED_TAGS).map(t => t.toLowerCase()).join(',')) !== null;
@@ -250,11 +298,20 @@ function groupAdjacentBlocks(blocks) {
 
 /**
  * Two elements belong to the same logical group when:
- * 1. Same direct parent, OR
+ * 1. Same direct parent AND a non-translatable element sits between them
+ *    (e.g. equation table splitting a paragraph), OR
  * 2. Both are inside the same SVG foreignObject (Summary boxes, etc.)
+ *
+ * Directly-adjacent siblings (LI items, consecutive P tags) stay independent.
  */
 function sameLogicalGroup(el1, el2) {
-  if (el1.parentElement === el2.parentElement) return true;
+  // Tables are standalone — don't group with other elements
+  if (el1.tagName === 'TABLE' || el2.tagName === 'TABLE') return false;
+
+  // Same parent + non-translatable between → equation area split by formula
+  if (el1.parentElement === el2.parentElement && hasNonTranslatableBetween(el1, el2)) {
+    return true;
+  }
 
   // Elements inside the same foreignObject form one logical unit
   // (e.g. arXiv "Summary & Ideas" boxes rendered as SVG foreignObject)
@@ -262,6 +319,18 @@ function sameLogicalGroup(el1, el2) {
   if (fo && fo === findForeignObject(el2)) return true;
 
   return false;
+}
+
+/** Check if there's at least one non-translatable element between two siblings. */
+function hasNonTranslatableBetween(el1, el2) {
+  let node = el1.nextElementSibling;
+  let found = false;
+  while (node && node !== el2) {
+    if (TRANSLATABLE_TAGS.has(node.tagName)) return false;
+    found = true;
+    node = node.nextElementSibling;
+  }
+  return node === el2 && found;
 }
 
 function findForeignObject(el) {

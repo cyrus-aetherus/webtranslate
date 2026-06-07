@@ -47,8 +47,9 @@ describe('collectImageUrls', () => {
       </article>
     `;
     const urls = collectImageUrls();
-    expect(urls).toContain('https://example.com/a.png');
-    expect(urls).toContain('https://example.com/b.png');
+    const absolutes = urls.map(u => u.absolute);
+    expect(absolutes).toContain('https://example.com/a.png');
+    expect(absolutes).toContain('https://example.com/b.png');
   });
 
   it('excludes data URLs', () => {
@@ -70,6 +71,7 @@ describe('collectImageUrls', () => {
     `;
     const urls = collectImageUrls();
     expect(urls.length).toBe(1);
+    expect(urls[0].absolute).toBe('https://example.com/x.png');
   });
 });
 

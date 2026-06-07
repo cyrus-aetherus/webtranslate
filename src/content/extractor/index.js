@@ -36,6 +36,7 @@ export function extractParagraphs() {
     element: block.element,
     text: block.text,
     allElements: block.groupElements || [block.element],
+    isTable: block.isTable || false,
   }));
 
   // Debug: log extraction summary

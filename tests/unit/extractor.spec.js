@@ -75,10 +75,10 @@ describe('extractParagraphs — text-driven', () => {
   it('extracts p tags', () => {
     document.body.innerHTML = '<article><p>First</p><p>Second</p></article>';
     const result = extractParagraphs();
-    expect(result.length).toBe(1);
+    // Directly adjacent siblings → NOT grouped
+    expect(result.length).toBe(2);
     expect(result[0].text).toContain('First');
-    expect(result[0].text).toContain('Second');
-    expect(result[0].allElements.length).toBe(2);
+    expect(result[1].text).toContain('Second');
   });
 
   it('extracts any tag with enough direct text (text-driven)', () => {
@@ -125,9 +125,10 @@ describe('extractParagraphs — text-driven', () => {
       </main>
     `;
     const result = extractParagraphs();
-    expect(result.length).toBe(1);
-    expect(result[0].allElements.length).toBe(2);
+    // Directly adjacent P siblings → 2 separate blocks
+    expect(result.length).toBe(2);
     expect(el(result[0]).tagName).toBe('P');
+    expect(el(result[1]).tagName).toBe('P');
   });
 
   it('recurses into elements with interactive descendants', () => {
@@ -157,10 +158,10 @@ describe('extractParagraphs — text-driven', () => {
     `;
     const result = extractParagraphs();
     // div has no direct text, recurses to children
-    // each span has direct text >= 15, extracted individually, then grouped by parent
-    expect(result.length).toBe(1);
-    expect(result[0].allElements.length).toBe(2);
+    // each span has direct text >= 15, extracted individually — adjacent → separate
+    expect(result.length).toBe(2);
     expect(el(result[0]).tagName).toBe('SPAN');
+    expect(el(result[1]).tagName).toBe('SPAN');
   });
 
   it('extracts parent div when it has direct text, skipping child spans', () => {
@@ -209,10 +210,10 @@ describe('extractParagraphs — text-driven', () => {
         <p>A plain paragraph without math</p>
       </main>`;
     const result = extractParagraphs();
-    // Both should be extracted and grouped (same parent)
-    expect(result.length).toBe(1);
-    expect(result[0].allElements.length).toBe(2);
+    // Both should be extracted — directly adjacent → separate blocks
+    expect(result.length).toBe(2);
     expect(result[0].text).toContain('We formalize');
+    expect(result[1].text).toContain('A plain paragraph');
   });
 
   it('excludes elements inside math/svg/pre/code containers', () => {
@@ -315,7 +316,7 @@ describe('extractParagraphs — text-driven', () => {
     expect(result.length).toBe(1);
   });
 
-  it('extracts headings and list items grouped by parent', () => {
+  it('extracts headings and list items — adjacent siblings stay separate', () => {
     document.body.innerHTML = `
       <main>
         <h1>Title</h1>
@@ -324,12 +325,9 @@ describe('extractParagraphs — text-driven', () => {
       </main>
     `;
     const result = extractParagraphs();
-    // h1+p in <main> → 1 group; li+li in <ul> → 1 group
-    expect(result.length).toBe(2);
-    // First group: h1 + p (same parent = <main>)
-    expect(result[0].allElements.length).toBe(2);
-    // Second group: li + li (same parent = <ul>)
-    expect(result[1].allElements.length).toBe(2);
+    // h1 and p are adjacent in <main> → 2 separate blocks
+    // li items are adjacent in <ul> → 2 separate blocks
+    expect(result.length).toBe(4);
   });
 
   it('excludes ad-like containers by class name', () => {

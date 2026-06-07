@@ -27,11 +27,17 @@ export class DownloadManager {
     let md = markdown;
     const imageMap = new Map(); // url -> filename
 
-    imageUrls.forEach((url, idx) => {
+    imageUrls.forEach((item, idx) => {
+      // Support both old (string) and new ({absolute, original}) format
+      const url = typeof item === 'string' ? item : item.absolute;
+      const origSrc = typeof item === 'string' ? item : (item.original || item.absolute);
       const ext = url.split('.').pop().split('?')[0] || 'png';
-      const filename = `image_${String(idx + 1).padStart(3, '0')}.${ext}`;
-      imageMap.set(url, `images/${filename}`);
-      md = md.replace(url, `images/${filename}`);
+      const basename = `image_${String(idx + 1).padStart(3, '0')}.${ext}`;
+      const imgPath = `images/${basename}`;
+      imageMap.set(url, basename);
+      // Replace in markdown — try absolute URL AND original src attribute
+      md = md.split(url).join(imgPath);
+      if (origSrc !== url) md = md.split(origSrc).join(imgPath);
     });
 
     zip.file(`${pageTitle}.md`, md);
@@ -55,6 +61,7 @@ export class DownloadManager {
 
       try {
         const blob = await this._fetchImage(url);
+        // basename only — imagesFolder is already the images/ directory
         imagesFolder.file(filename, blob);
       } catch (err) {
         // no-cors fallback: keep original URL in markdown, skip binary

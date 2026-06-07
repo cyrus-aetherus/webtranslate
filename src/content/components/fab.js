@@ -80,6 +80,8 @@ const CSS = `
   box-shadow:0 1px 3px rgba(0,0,0,.08);
   transition:background .15s,transform .15s;}
 .wt-fab-menu-item:hover .wt-mi-dot{background:#eaddff;transform:scale(1.08);}
+
+
 .wt-fab-menu-item .wt-mi-label{background:#fff;padding:5px 12px;border-radius:16px;
   border:1px solid #e7e0ec;font-weight:500;font-size:12px;color:#1d1b20;
   box-shadow:0 1px 3px rgba(0,0,0,.06);}
@@ -89,12 +91,12 @@ const CSS = `
   background:#fff;border:2px solid #cac4d0;}
 .wt-fab-menu-item.wt-primary .wt-mi-label{font-weight:600;color:#1d1b20;}
 .wt-fab-menu-item.wt-primary:hover .wt-mi-dot{background:#eaddff;border-color:#6750a4;}
-.wt-fab-menu-item.wt-primary:hover .wt-mi-dot svg{stroke:#6750a4;}
+
 .wt-fab-menu-item.wt-primary:hover .wt-mi-label{background:#eaddff;color:#6750a4;}
 .wt-fab-menu-item.wt-primary.wt-stop .wt-mi-dot{background:#f9dedc;border-color:#b3261e;}
 .wt-fab-menu-item.wt-primary.wt-stop .wt-mi-label{color:#b3261e;font-weight:600;}
 .wt-fab-menu-item.wt-primary.wt-stop:hover .wt-mi-dot{background:#b3261e;border-color:#b3261e;}
-.wt-fab-menu-item.wt-primary.wt-stop:hover .wt-mi-dot svg{stroke:#fff;}
+
 .wt-fab-menu-item.wt-primary.wt-stop:hover .wt-mi-label{background:#b3261e;color:#fff;}
 
 .wt-fab-menu-item.wt-active-mode .wt-mi-dot{background:#eaddff;border-color:#6750a4;}
@@ -113,43 +115,15 @@ const SVG_ICON = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none">
   <path class="wt-fab-t" d="M8.5 8.5h7v1.4h-2.8v5.6h-1.4V9.9H8.5z"/>
 </svg>`;
 
-// SVG line icons for radial menu
+// Data URI icons — rendered as <img>, isolated from page CSS
 const MENU_ICONS = {
-  translate: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#49454f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M5 8l6 6"/><path d="M4 14l6-6 2-3"/>
-    <path d="M2 5h12"/><path d="M7 2h1"/>
-    <path d="M22 22l-5-10-5 10"/><path d="M14 18h6"/>
-  </svg>`,
-  panel: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#49454f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="3" y="3" width="18" height="18" rx="2"/>
-    <line x1="9" y1="3" x2="9" y2="21"/>
-  </svg>`,
-  download: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#49454f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-    <polyline points="7 10 12 15 17 10"/>
-    <line x1="12" y1="15" x2="12" y2="3"/>
-  </svg>`,
-  settings: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#49454f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
-    <line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/>
-    <line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/>
-    <line x1="1" y1="14" x2="7" y2="14"/>
-    <line x1="9" y1="8" x2="15" y2="8"/>
-    <line x1="17" y1="16" x2="23" y2="16"/>
-  </svg>`,
-  stop: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#b3261e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-    <line x1="18" y1="6" x2="6" y2="18"/>
-    <line x1="6" y1="6" x2="18" y2="18"/>
-  </svg>`,
-  retranslate: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#49454f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <polyline points="23 4 23 10 17 10"/>
-    <polyline points="1 20 1 14 7 14"/>
-    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-  </svg>`,
-  clear: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#49454f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <polyline points="3 6 5 6 21 6"/>
-    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-  </svg>`,
+  translate: `<img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIj48cGF0aCBkPSJNNSA4bDYgNiIgc3Ryb2tlPSIjMWQxYjIwIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxwYXRoIGQ9Ik00IDE0bDYtNiAyLTMiIHN0cm9rZT0iIzFkMWIyMCIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48cGF0aCBkPSJNMiA1aDEyIiBzdHJva2U9IiMxZDFiMjAiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PHBhdGggZD0iTTIyIDIybC01LTEwLTUgMTAiIHN0cm9rZT0iIzFkMWIyMCIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48cGF0aCBkPSJNMTQgMThoNiIgc3Ryb2tlPSIjMWQxYjIwIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjwvc3ZnPg==" width="20" height="20" style="display:block">`,
+  panel: `<img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIj48cmVjdCB4PSIzIiB5PSIzIiB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIHJ4PSIyIiBzdHJva2U9IiMxZDFiMjAiIHN0cm9rZS13aWR0aD0iMiIvPjxsaW5lIHgxPSI5IiB5MT0iMyIgeDI9IjkiIHkyPSIyMSIgc3Ryb2tlPSIjMWQxYjIwIiBzdHJva2Utd2lkdGg9IjIiLz48L3N2Zz4=" width="20" height="20" style="display:block">`,
+  download: `<img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIj48cGF0aCBkPSJNMjEgMTV2NGEyIDIgMCAwIDEtMiAySDVhMiAyIDAgMCAxLTItMnYtNCIgc3Ryb2tlPSIjMWQxYjIwIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxwb2x5bGluZSBwb2ludHM9IjcgMTAgMTIgMTUgMTcgMTAiIHN0cm9rZT0iIzFkMWIyMCIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48bGluZSB4MT0iMTIiIHkxPSIxNSIgeDI9IjEyIiB5Mj0iMyIgc3Ryb2tlPSIjMWQxYjIwIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjwvc3ZnPg==" width="20" height="20" style="display:block">`,
+  settings: `<img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIj48bGluZSB4MT0iNCIgeTE9IjIxIiB4Mj0iNCIgeTI9IjE0IiBzdHJva2U9IiMxZDFiMjAiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGxpbmUgeDE9IjQiIHkxPSIxMCIgeDI9IjQiIHkyPSIzIiBzdHJva2U9IiMxZDFiMjAiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGxpbmUgeDE9IjEyIiB5MT0iMjEiIHgyPSIxMiIgeTI9IjEyIiBzdHJva2U9IiMxZDFiMjAiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGxpbmUgeDE9IjEyIiB5MT0iOCIgeDI9IjEyIiB5Mj0iMyIgc3Ryb2tlPSIjMWQxYjIwIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxsaW5lIHgxPSIyMCIgeTE9IjIxIiB4Mj0iMjAiIHkyPSIxNiIgc3Ryb2tlPSIjMWQxYjIwIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxsaW5lIHgxPSIyMCIgeTE9IjEyIiB4Mj0iMjAiIHkyPSIzIiBzdHJva2U9IiMxZDFiMjAiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PC9zdmc+" width="20" height="20" style="display:block">`,
+  stop: `<img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIj48bGluZSB4MT0iMTgiIHkxPSI2IiB4Mj0iNiIgeTI9IjE4IiBzdHJva2U9IiNiMzI2MWUiIHN0cm9rZS13aWR0aD0iMi41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48bGluZSB4MT0iNiIgeTE9IjYiIHgyPSIxOCIgeTI9IjE4IiBzdHJva2U9IiNiMzI2MWUiIHN0cm9rZS13aWR0aD0iMi41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48L3N2Zz4=" width="20" height="20" style="display:block">`,
+  retranslate: `<img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIj48cG9seWxpbmUgcG9pbnRzPSIyMyA0IDIzIDEwIDE3IDEwIiBzdHJva2U9IiMxZDFiMjAiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PHBvbHlsaW5lIHBvaW50cz0iMSAyMCAxIDE0IDcgMTQiIHN0cm9rZT0iIzFkMWIyMCIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48cGF0aCBkPSJNMy41MSA5YTkgOSAwIDAgMSAxNC44NS0zLjM2TDIzIDEwTTEgMTRsNC42NCA0LjM2QTkgOSAwIDAgMCAyMC40OSAxNSIgc3Ryb2tlPSIjMWQxYjIwIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjwvc3ZnPg==" width="20" height="20" style="display:block">`,
+  clear: `<img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIj48cG9seWxpbmUgcG9pbnRzPSIzIDYgNSA2IDIxIDYiIHN0cm9rZT0iIzFkMWIyMCIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48cGF0aCBkPSJNMTkgNnYxNGEyIDIgMCAwIDEtMiAySDdhMiAyIDAgMCAxLTItMlY2bTMgMFY0YTIgMiAwIDAgMSAyLTJoNGEyIDIgMCAwIDEgMiAydjIiIHN0cm9rZT0iIzFkMWIyMCIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48L3N2Zz4=" width="20" height="20" style="display:block">`,
 };
 
 /**
