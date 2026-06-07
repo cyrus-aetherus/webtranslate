@@ -204,7 +204,7 @@ export class FabComponent {
   }
 
   mount() {
-    this._pos = { x: innerWidth - SIZE - 24, y: innerHeight - SIZE - 32 };
+    this._pos = { x: innerWidth - SIZE - 24, y: (innerHeight - SIZE) / 2 };
     this._injectStyles();
     this._createFab();
     this._createMenu('IDLE', 'inline');
