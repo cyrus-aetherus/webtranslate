@@ -52,10 +52,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ ok: true, downloadId: message.downloadId });
       return false;
 
-    case MSG.OPEN_PANEL:
-      chrome.action?.openPopup().catch(() => {});
-      sendResponse({ ok: true });
-      return false;
+    case MSG.OPEN_SETTINGS:
+      openSettingsPage()
+        .then(() => sendResponse({ ok: true }))
+        .catch((err) => sendResponse({ ok: false, error: err.message }));
+      return true;
 
     case 'OPEN_SIDE_PANEL':
       openSidePanel(tabId ?? sender.tab?.id)
@@ -80,6 +81,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return false;
   }
 });
+
+async function openSettingsPage() {
+  await chrome.runtime.openOptionsPage();
+}
 
 /**
  * Handle TRANSLATE_BATCH request.

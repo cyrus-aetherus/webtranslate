@@ -39,13 +39,12 @@ describe('validateApiUrl', () => {
   it('accepts valid HTTPS URL', () => {
     const r = validateApiUrl('https://api.openai.com/v1');
     expect(r.valid).toBe(true);
-    expect(r.isHttp).toBe(false);
   });
 
-  it('accepts HTTP with isHttp flag', () => {
+  it('rejects HTTP URLs', () => {
     const r = validateApiUrl('http://localhost:3000/v1');
-    expect(r.valid).toBe(true);
-    expect(r.isHttp).toBe(true);
+    expect(r.valid).toBe(false);
+    expect(r.message).toContain('HTTPS');
   });
 
   it('rejects empty string', () => {

@@ -21,6 +21,7 @@ import { PanelRenderer } from './renderers/panel-renderer.js';
 import { init as initI18n, t } from '../shared/i18n.js';
 import { FabComponent } from './components/fab.js';
 import { generateMarkdown, collectImageUrls, triggerDownload } from './download-trigger.js';
+import { openSettingsPage } from './open-settings.js';
 
 // ------------------------------------------------------------------
 // Global instances
@@ -71,10 +72,7 @@ async function init() {
       switchMode(to);
     },
     onDownload: () => handleDownload(),
-    onSettings: () => {
-      try { chrome.action?.openPopup?.(); } catch (e) {}
-      try { chrome.runtime.sendMessage({ type: MSG.OPEN_PANEL }); } catch {}
-    },
+    onSettings: () => openSettingsPage(),
     onStop: () => stopTranslation(),
     onRetranslate: () => retranslate(currentMode),
     onClear: () => clearTranslations(),
@@ -886,8 +884,7 @@ function showConfigToast() {
     cursor:'pointer',fontSize:'13px',color:'#6b7280',fontWeight:'500',
   });
   btn.addEventListener('click', () => {
-    try { chrome.action?.openPopup?.(); } catch {}
-    try { chrome.runtime.sendMessage({ type: 'OPEN_PANEL' }); } catch {}
+    openSettingsPage();
     toast.remove();
   });
   close.addEventListener('click', () => {

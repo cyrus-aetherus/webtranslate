@@ -5,6 +5,8 @@ import {
   validateApiUrl, validateApiKey, validateModel,
   validateConcurrency, validateMaxBatchChars, validateConfig,
 } from '../shared/utils.js';
+import { buildRequest as buildOpenAiRequest } from '../background/adapters/openai.js';
+import { buildRequest as buildAnthropicRequest } from '../background/adapters/anthropic.js';
 import { DEFAULT_CONFIG, estimateCost } from '../shared/constants.js';
 import { init as initI18n, t, tf, applyI18nElements, setLocale } from '../shared/i18n.js';
 
@@ -21,14 +23,18 @@ document.querySelectorAll('.nav-item').forEach(btn => {
 });
 
 // ---- Tab switching ---------------------------------------------------------
-document.querySelectorAll('.nav-item').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
-    if (btn.dataset.tab === 'stats') loadStats();
+function activateTab(tab) {
+  document.querySelectorAll('.nav-item').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tab);
   });
+  document.querySelectorAll('.tab-panel').forEach(panel => {
+    panel.classList.toggle('active', panel.id === `tab-${tab}`);
+  });
+  if (tab === 'stats') loadStats();
+}
+
+document.querySelectorAll('.nav-item').forEach(btn => {
+  btn.addEventListener('click', () => activateTab(btn.dataset.tab));
 });
 
 // ---- DOM refs --------------------------------------------------------------
@@ -43,6 +49,10 @@ const testResultEl = $('test-result');
 const translationResultEl = $('translation-result');
 const settingsResultEl = $('settings-result');
 const exportBtn = $('exportBtn'), importBtn = $('importBtn'), importFile = $('importFile');
+
+// A toolbar popup remains compact and starts on Statistics. The same document
+// used as a standalone options page starts on Settings.
+if (window.innerWidth >= 700) activateTab('settings');
 
 // ---- Init ------------------------------------------------------------------
 async function bootstrap() {
@@ -91,13 +101,17 @@ async function testConnection() {
   testBtn.disabled = true; showTest(null, t('popup.test_connecting'));
   try {
     const cfg = gatherConfig();
-    const url = cfg.apiUrl.replace(/\/$/, '').replace(/\/v1$/, '') + '/v1/chat/completions';
-    const res = await fetch(url, { method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.apiKey}` },
-      body: JSON.stringify({ model: cfg.model, messages: [{ role: 'user', content: 'hello' }], max_tokens: 16 }),
+    const prompt = { sys: 'Reply briefly.', user: 'hello' };
+    const request = cfg.adapter === 'anthropic'
+      ? buildAnthropicRequest(prompt, cfg, 16)
+      : buildOpenAiRequest(prompt, cfg, 16);
+    const res = await fetch(request.url, {
+      method: 'POST',
+      headers: request.headers,
+      body: request.body,
     });
     if (res.ok) showTest(true, t('popup.test_success'));
-    else if (res.status === 404) showTest(false, `HTTP 404: ${url}`);
+    else if (res.status === 404) showTest(false, `HTTP 404: ${request.url}`);
     else if (res.status === 401 || res.status === 403) showTest(false, t('popup.test_auth_fail'));
     else showTest(false, `HTTP ${res.status}`);
   } catch (e) { showTest(false, tf('popup.test_request_fail', { message: e.message })); }
@@ -115,7 +129,6 @@ function gatherConfig() {
 async function saveModelConfig() {
   if (!validateModelFields()) return;
   const cfg = gatherConfig();
-  if (validateApiUrl(cfg.apiUrl).isHttp && !confirm(t('popup.save_http_warning'))) return;
   await chrome.storage.local.set({ apiUrl: cfg.apiUrl, apiKey: cfg.apiKey, model: cfg.model, adapter: cfg.adapter });
   showTest(true, t('popup.save_success'));
 }

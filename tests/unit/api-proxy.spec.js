@@ -31,6 +31,26 @@ describe('ApiProxy retry', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
+  it('uses the Anthropic adapter when selected', async () => {
+    fetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: [{ text: '───SEP:abc───\n你好\n───SEP:END───' }],
+        usage: { input_tokens: 10, output_tokens: 5 },
+      }),
+    });
+
+    const { results } = await proxy.translateBatch(
+      [{ id: 'p1', fingerprint: 'abc', text: 'Hello' }],
+      { adapter: 'anthropic', apiUrl: 'https://api.anthropic.com', apiKey: 'sk-ant-test', model: 'claude-sonnet-4', sourceLang: 'en', targetLang: 'zh-CN' },
+      'anthropic-batch'
+    );
+
+    expect(results[0].translation).toBe('你好');
+    expect(fetch.mock.calls[0][0]).toBe('https://api.anthropic.com/v1/messages');
+    expect(fetch.mock.calls[0][1].headers['x-api-key']).toBe('sk-ant-test');
+  });
+
   it('retries on 500 then succeeds', async () => {
     fetch
       .mockResolvedValueOnce({ ok: false, status: 500, text: async () => 'Server Error' })

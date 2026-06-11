@@ -1,7 +1,7 @@
 # WebTranslate
 
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![Chrome](https://img.shields.io/badge/chrome-%3E%3D114-brightgreen)](https://www.google.com/chrome/)
+[![Chrome](https://img.shields.io/badge/chrome-%3E%3D116-brightgreen)](https://www.google.com/chrome/)
 
 > 基于大模型 API 的网页翻译 Chrome 扩展。点击悬浮按钮即可翻译整篇文章，支持内联和侧边面板两种模式，一键打包下载为 Markdown。
 

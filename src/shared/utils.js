@@ -44,17 +44,21 @@ export function debounce(fn, delay) {
 /**
  * Validate API URL format.
  * @param {string} url
- * @returns {{valid: boolean, isHttp: boolean, message?: string}}
+ * @returns {{valid: boolean, message?: string}}
  */
 export function validateApiUrl(url) {
   if (!url || typeof url !== 'string') {
-    return { valid: false, isHttp: false, message: 'API URL is required' };
+    return { valid: false, message: 'API URL is required' };
   }
-  const pattern = /^https?:\/\/\S+/;
-  if (!pattern.test(url)) {
-    return { valid: false, isHttp: false, message: 'Invalid URL format' };
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:') {
+      return { valid: false, message: 'API URL must use HTTPS' };
+    }
+  } catch {
+    return { valid: false, message: 'Invalid URL format' };
   }
-  return { valid: true, isHttp: url.startsWith('http://') };
+  return { valid: true };
 }
 
 /**

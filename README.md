@@ -1,7 +1,7 @@
 # WebTranslate
 
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![Chrome](https://img.shields.io/badge/chrome-%3E%3D114-brightgreen)](https://www.google.com/chrome/)
+[![Chrome](https://img.shields.io/badge/chrome-%3E%3D116-brightgreen)](https://www.google.com/chrome/)
 
 > LLM-powered webpage translation Chrome extension. Translate any page inline or via side panel, with one-click download as Markdown.
 

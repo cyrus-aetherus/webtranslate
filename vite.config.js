@@ -71,11 +71,21 @@ export default defineConfig({
         console.log('[postbuild] content.js built as IIFE via Rollup');
 
         // ---- Strip modulepreload import from SW/popup/panel JS -------
-        for (const name of ['background.js', 'panel.js', 'popup.js']) {
+        for (const name of ['background.js', 'content.js', 'panel.js', 'popup.js']) {
           const p = resolve(dist, name);
           if (existsSync(p)) {
             let code = readFileSync(p, 'utf-8');
             code = code.replace(/^import\s*"[^"]*modulepreload[^"]*"\s*;?\s*\n?/gm, '');
+            // JSZip's setImmediate shim supports string callbacks via
+            // `new Function`. The extension only passes function callbacks,
+            // so remove that CSP-incompatible fallback from the store build.
+            code = code.replace(
+              /new Function\(""\+([A-Za-z_$][\w$]*)\)/g,
+              '(()=>{throw new TypeError("callback must be a function")})()'
+            );
+            if (/\beval\s*\(|\bnew Function\s*\(/.test(code)) {
+              throw new Error(`[postbuild] dynamic code execution found in ${name}`);
+            }
             writeFileSync(p, code, 'utf-8');
           }
         }
@@ -120,17 +130,18 @@ export default defineConfig({
         writeFileSync(resolve(dist, 'manifest.json'), JSON.stringify({
           manifest_version: 3,
           name: 'WebTranslate',
-          version: '1.0.0',
+          version: '1.0.1',
           description: 'LLM-powered webpage translation & download',
-          minimum_chrome_version: '114',
-          permissions: ['activeTab', 'storage', 'downloads', 'scripting', 'sidePanel'],
-          host_permissions: ['<all_urls>'],
+          minimum_chrome_version: '116',
+          permissions: ['storage', 'downloads', 'sidePanel'],
+          host_permissions: ['http://*/*', 'https://*/*'],
           background: { service_worker: 'background.js', type: 'module' },
           side_panel: { default_path: 'panel.html' },
           action: {
             default_popup: 'popup.html',
             default_icon: { '16': 'assets/icons/icon16.png', '32': 'assets/icons/icon32.png' },
           },
+          options_ui: { page: 'popup.html', open_in_tab: true },
           icons: {
             '16': 'assets/icons/icon16.png', '32': 'assets/icons/icon32.png',
             '48': 'assets/icons/icon48.png', '128': 'assets/icons/icon128.png',
@@ -143,8 +154,8 @@ export default defineConfig({
             all_frames: false,
           }],
           web_accessible_resources: [{
-            resources: ['assets/*', 'src/shared/locales/*'],
-            matches: ['<all_urls>'],
+            resources: ['src/shared/locales/*'],
+            matches: ['http://*/*', 'https://*/*'],
           }],
         }, null, 2) + '\n', 'utf-8');
 

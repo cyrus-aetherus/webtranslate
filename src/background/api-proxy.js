@@ -8,6 +8,8 @@
  */
 
 import { buildSystemPrompt, calcMaxTokens, parseBatchResponse } from '../shared/utils.js';
+import * as openAiAdapter from './adapters/openai.js';
+import * as anthropicAdapter from './adapters/anthropic.js';
 
 export class ApiProxy {
   constructor() {
@@ -143,15 +145,12 @@ export class ApiProxy {
   // ------------------------------------------------------------------
 
   _resolveAdapter(name) {
-    // Dynamic import to keep SW lightweight
     switch (name) {
       case 'anthropic':
-        // Lazy load will be handled in actual build
-        throw new Error('Anthropic adapter not yet loaded');
+        return anthropicAdapter;
       case 'openai':
       default:
-        // OpenAI-compatible adapter is default
-        return this._openaiAdapter || (this._openaiAdapter = createOpenAiAdapter());
+        return openAiAdapter;
     }
   }
 
@@ -182,41 +181,4 @@ export class ApiProxy {
 
 function escapeSep(text) {
   return text.replace(/───SEP:/g, '​───SEP​:');
-}
-
-function createOpenAiAdapter() {
-  return {
-    buildRequest(batchText, config, maxTokens) {
-      const base = config.apiUrl.replace(/\/$/, '').replace(/\/v1$/, '');
-      const url = base + '/v1/chat/completions';
-      return {
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: config.model,
-          messages: [
-            { role: 'system', content: batchText.sys },
-            { role: 'user', content: batchText.user },
-          ],
-          temperature: config.temperature ?? 0.1,
-          max_tokens: maxTokens,
-          stream: false,
-        }),
-      };
-    },
-    parseResponse(raw) {
-      const choice = raw.choices?.[0];
-      if (!choice) throw new Error('No choices in API response');
-      return {
-        content: choice.message?.content ?? '',
-        usage: raw.usage ? {
-          promptTokens: raw.usage.prompt_tokens,
-          completionTokens: raw.usage.completion_tokens,
-        } : null,
-      };
-    },
-  };
 }

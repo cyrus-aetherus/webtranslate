@@ -1,11 +1,11 @@
 {
   "manifest_version": 3,
   "name": "WebTranslate",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "LLM-powered webpage translation & download",
-  "minimum_chrome_version": "114",
-  "permissions": ["activeTab", "storage", "downloads", "scripting", "sidePanel"],
-  "host_permissions": ["<all_urls>"],
+  "minimum_chrome_version": "116",
+  "permissions": ["storage", "downloads", "sidePanel"],
+  "host_permissions": ["http://*/*", "https://*/*"],
   "background": {
     "service_worker": "src/background/sw.js",
     "type": "module"
@@ -19,6 +19,10 @@
       "16": "src/assets/icons/icon16.png",
       "32": "src/assets/icons/icon32.png"
     }
+  },
+  "options_ui": {
+    "page": "src/popup/popup.html",
+    "open_in_tab": true
   },
   "icons": {
     "16": "src/assets/icons/icon16.png",
@@ -37,8 +41,8 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["src/assets/*"],
-      "matches": ["<all_urls>"]
+      "resources": ["src/shared/locales/*"],
+      "matches": ["http://*/*", "https://*/*"]
     }
   ]
 }

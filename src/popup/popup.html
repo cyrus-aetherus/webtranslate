@@ -127,6 +127,156 @@
     #panel::-webkit-scrollbar { width: 4px; }
     #panel::-webkit-scrollbar-track { background: transparent; }
     #panel::-webkit-scrollbar-thumb { background: var(--outline); border-radius: 2px; }
+
+    /* Standalone options page. The toolbar popup keeps the compact styles above. */
+    @media (min-width: 700px) {
+      :root {
+        --bg: #f4f1fb;
+        --surface: #ffffff;
+        --text: #211a2d;
+        --muted: #71677e;
+        --primary: #6842b8;
+        --primary-light: #eee6ff;
+        --border: #e8e0f0;
+        --outline: #cec3da;
+        --radius: 18px;
+        --nav-w: 210px;
+      }
+      body {
+        width: 100%;
+        height: auto;
+        min-height: 100vh;
+        overflow: auto;
+        display: grid;
+        grid-template-columns: minmax(0, 960px);
+        grid-template-rows: auto minmax(620px, auto) auto;
+        justify-content: center;
+        align-content: center;
+        padding: 48px 24px;
+        background:
+          radial-gradient(circle at 15% 10%, rgba(132, 91, 214, .15), transparent 30%),
+          radial-gradient(circle at 90% 85%, rgba(96, 165, 250, .12), transparent 28%),
+          var(--bg);
+        font-size: 14px;
+      }
+      #app-header {
+        padding: 22px 28px;
+        border: 1px solid var(--border);
+        border-bottom: 0;
+        border-radius: 24px 24px 0 0;
+        box-shadow: 0 20px 60px rgba(66, 42, 98, .10);
+      }
+      .header-logo {
+        width: 38px;
+        height: 38px;
+        border-radius: 12px;
+      }
+      .header-title {
+        font-size: 20px;
+        font-weight: 700;
+      }
+      #app-body {
+        min-height: 620px;
+        border: 1px solid var(--border);
+        border-top: 0;
+        border-bottom: 0;
+        background: var(--surface);
+        box-shadow: 0 20px 60px rgba(66, 42, 98, .10);
+      }
+      #nav {
+        padding: 24px 14px;
+        background: #fbf9fe;
+      }
+      .nav-item {
+        margin: 3px 0;
+        padding: 13px 18px;
+        border-radius: 12px;
+        font-size: 14px;
+        gap: 12px;
+      }
+      .nav-item .nav-icon {
+        width: 22px;
+        height: 22px;
+      }
+      .nav-item.active {
+        box-shadow: inset 3px 0 0 var(--primary);
+      }
+      #panel {
+        padding: 42px 48px;
+        background: linear-gradient(180deg, #fff, #fdfcff);
+      }
+      .tab-panel {
+        max-width: 620px;
+      }
+      .field {
+        margin-bottom: 22px;
+      }
+      .field label {
+        margin-bottom: 8px;
+        font-size: 13px;
+        font-weight: 650;
+        color: #51475d;
+      }
+      .field input,
+      .field select {
+        min-height: 46px;
+        padding: 11px 14px;
+        border-radius: 12px;
+        font-size: 14px;
+        box-shadow: 0 1px 2px rgba(42, 28, 58, .03);
+      }
+      .field input:focus,
+      .field select:focus {
+        padding: 10px 13px;
+        box-shadow: 0 0 0 4px rgba(104, 66, 184, .10);
+      }
+      .field .hint,
+      .field .error {
+        margin-top: 6px;
+        font-size: 12px;
+      }
+      .row {
+        gap: 18px;
+      }
+      .btn {
+        min-height: 42px;
+        padding: 9px 22px;
+        border-radius: 12px;
+        font-size: 13px;
+        font-weight: 650;
+      }
+      .btn.primary,
+      .btn.success {
+        box-shadow: 0 8px 20px rgba(104, 66, 184, .22);
+      }
+      .actions-bar {
+        gap: 10px;
+        padding: 14px 0;
+      }
+      .stat-card {
+        padding: 26px;
+        border-radius: 18px;
+        box-shadow: 0 12px 34px rgba(70, 45, 100, .08);
+      }
+      .stat-grid {
+        gap: 18px;
+      }
+      .stat-item {
+        padding: 15px;
+        border-radius: 14px;
+        background: #f8f5fd;
+      }
+      .stat-item .val {
+        font-size: 26px;
+      }
+      #app-footer {
+        padding: 14px 24px;
+        border: 1px solid var(--border);
+        border-top: 0;
+        border-radius: 0 0 24px 24px;
+        box-shadow: 0 20px 60px rgba(66, 42, 98, .10);
+      }
+    }
   </style>
 </head>
 <body>
@@ -259,7 +409,7 @@
       </div>
     </div>
   </div>
-  <div id="app-footer" data-i18n="popup.footer">API Key stored locally · never uploaded to third parties</div>
+  <div id="app-footer" data-i18n="popup.footer">API key stored locally and sent only to your configured HTTPS API</div>
 
   <script type="module" src="./popup.js"></script>
 </body>
