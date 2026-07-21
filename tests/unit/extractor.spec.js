@@ -267,6 +267,23 @@ describe('extractParagraphs — text-driven', () => {
     expect(result[1].text).toContain('A separate section paragraph');
   });
 
+  it('does not group paragraphs separated by translation UI (spinner / card)', () => {
+    document.body.innerHTML = `
+      <main>
+        <p>First paragraph awaiting translation result.</p>
+        <div class="wt-pending"><span class="wt-spinner"></span> Translating...</div>
+        <p>Second paragraph awaiting translation result.</p>
+        <div class="wt-inline-block"><div class="wt-inline-body">已翻译</div></div>
+        <p>Third paragraph awaiting translation result.</p>
+      </main>`;
+    const result = extractParagraphs();
+    // Pending spinner / rendered card must NOT act as an "equation-like"
+    // separator that merges paragraphs into one group — otherwise the merged
+    // translation overwrites the correct per-paragraph card (misalignment bug).
+    expect(result.length).toBe(3);
+    expect(result.every((r) => r.allElements.length === 1)).toBe(true);
+  });
+
   it('does not extract elements inside table cells', () => {
     document.body.innerHTML = `
       <main>

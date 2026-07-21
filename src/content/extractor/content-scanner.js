@@ -327,10 +327,21 @@ function hasNonTranslatableBetween(el1, el2) {
   let found = false;
   while (node && node !== el2) {
     if (TRANSLATABLE_TAGS.has(node.tagName)) return false;
+    // Translation UI (pending spinners / rendered cards / table clones) is an
+    // artifact inserted by us, NOT a genuine content separator.  Treating it
+    // as one would merge two in-flight paragraphs into a spurious group whose
+    // combined translation later overwrites the correct per-paragraph card.
+    if (isTranslationUI(node)) return false;
     found = true;
     node = node.nextElementSibling;
   }
   return node === el2 && found;
+}
+
+function isTranslationUI(el) {
+  return el.classList?.contains('wt-inline-block')
+      || el.classList?.contains('wt-pending')
+      || el.classList?.contains('wt-table-translated');
 }
 
 function findForeignObject(el) {
