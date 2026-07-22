@@ -130,7 +130,7 @@ export default defineConfig({
         writeFileSync(resolve(dist, 'manifest.json'), JSON.stringify({
           manifest_version: 3,
           name: 'WebTranslate',
-          version: '1.0.1',
+          version: '1.0.3',
           description: 'LLM-powered webpage translation & download',
           minimum_chrome_version: '116',
           permissions: ['storage', 'downloads', 'sidePanel'],
