@@ -32,3 +32,5 @@ test-results/
 *-test.png
 *-icons.png
 dot-pixels.png
+.claude/
+chrome-profile/
