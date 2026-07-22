@@ -448,8 +448,11 @@ export class FabComponent {
         } else {
           this._setPos(d.wt_fab_pos.x, d.wt_fab_pos.y);
         }
+        return;
       }
     } catch {}
+    // No saved position — apply default (right-center) to DOM
+    this._setPos(this._pos.x, this._pos.y);
   }
 
   /** Listen for language changes in storage and update labels. */

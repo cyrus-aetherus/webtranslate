@@ -1,6 +1,6 @@
 {
   "name": "webtranslate",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A browser extension for webpage translation and download powered by LLM APIs",
   "license": "MIT",
   "repository": {
